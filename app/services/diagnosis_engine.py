@@ -5,6 +5,8 @@ weather_modifier(), Phase 3 adds category_modifier() — both just get
 appended to `_run_signals()`'s returned list. Nothing below the
 combine step needs to change shape.
 """
+import random
+
 from app.schemas import DiagnosisResult, SignalScore
 from app.services.image_analysis import (
     droop_shape_score,
@@ -117,6 +119,9 @@ def diagnose(images: list[bytes]) -> tuple[DiagnosisResult, list[SignalScore]]:
     if total_count > 1 and agreement_ratio < 1.0:
         summary += f" ({supporting_count} of {total_count} photos support this — the rest were less clear.)"
 
+    voice_lines = entry.get("voice_lines") or [""]
+    voice_line = random.choice(voice_lines)
+
     result = DiagnosisResult(
         issue_key=winning_issue,
         issue_label=entry["label"],
@@ -128,5 +133,6 @@ def diagnose(images: list[bytes]) -> tuple[DiagnosisResult, list[SignalScore]]:
         supporting_photo_count=supporting_count,
         total_photo_count=total_count,
         agreement_ratio=round(agreement_ratio, 2),
+        plant_voice_line=voice_line,
     )
     return result, all_signals

@@ -12,11 +12,30 @@ class SpeciesCandidate(BaseModel):
     name: str
     common_name: Optional[str] = None
     probability: float = Field(ge=0.0, le=1.0)
+    genus: Optional[str] = None
+    family: Optional[str] = None
+    gbif_id: Optional[int] = None  # links to the Global Biodiversity
+    # Information Facility's record for this species — free to query
+    # further (native range, occurrence data) if ever wanted later.
+
+
+class CareInfo(BaseModel):
+    """
+    From Perenual (https://perenual.com/), keyed off the top species
+    match. Deliberately excludes Perenual's edible_fruit/edible_leaf
+    fields — see care_service.py for why.
+    """
+    watering: Optional[str] = None
+    sunlight: list[str] = Field(default_factory=list)
+    cycle: Optional[str] = None
+    toxic_to_pets: Optional[bool] = None
+    source: str = "Perenual"
 
 
 class IdentifyResponse(BaseModel):
     candidates: list[SpeciesCandidate]
     is_plant_probability: float = Field(ge=0.0, le=1.0)
+    care: Optional[CareInfo] = None
 
 
 class SignalScore(BaseModel):
@@ -39,6 +58,7 @@ class DiagnosisResult(BaseModel):
     supporting_photo_count: int = 1  # photos whose top signal agreed with the final diagnosis
     total_photo_count: int = 1
     agreement_ratio: float = Field(default=1.0, ge=0.0, le=1.0)
+    plant_voice_line: str = ""  # short first-person quip from the plant's "perspective"
 
 
 class ScanResponse(BaseModel):

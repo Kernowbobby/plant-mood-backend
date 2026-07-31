@@ -8,16 +8,17 @@ else (weather, categories, gamification) gets layered on top.
 
 ```bash
 pip install -r requirements.txt
-cp .env.example .env   # optional — works fine with PLANT_ID_API_KEY blank
+cp .env.example .env   # optional — works fine with PLANTNET_API_KEY blank
 uvicorn app.main:app --reload
 ```
 
 Server starts at `http://127.0.0.1:8000`. Interactive docs at `/docs`.
 
-Without a `PLANT_ID_API_KEY` set, species identification runs in **mock
+Without a `PLANTNET_API_KEY` set, species identification runs in **mock
 mode** — it returns a fixed, structurally valid set of candidates so you
-can build and test the diagnosis pipeline for free. Get a real key at
-https://web.plant.id/ when you're ready.
+can build and test the diagnosis pipeline for free. Get a real (genuinely
+free, up to 500 identifications/day) key at https://my.plantnet.org/
+when you're ready.
 
 ## Try it
 
@@ -45,7 +46,7 @@ angles the way diagnosis does.
   - `identification`: top species candidates (or `null` if skipped/failed)
   - `diagnosis`: issue, mood emoji, confidence, plain-English summary, fix steps
   - `signals`: every individual scorer's vote, for transparency/debugging
-- `GET /health` — confirms the server is up and whether Plant.id is live or mocked
+- `GET /health` — confirms the server is up and whether Pl@ntNet is live or mocked
 
 ## Diagnosis engine — how it's structured
 
@@ -53,8 +54,16 @@ angles the way diagnosis does.
 app/services/image_analysis.py    → independent signal scorers (pure functions)
 app/services/diagnosis_engine.py  → runs all scorers, combines via weighted vote
 app/services/issue_library.py     → static data: labels, mood emoji, fix steps
-app/services/plant_id_service.py  → wraps the Kindwise/Plant.id API (+ mock mode)
+app/services/plantnet_service.py  → wraps the free Pl@ntNet species-ID API (+ mock mode)
+app/services/care_service.py      → wraps the free Perenual care-info API (+ mock mode)
 ```
+
+**Deliberate scope limit, worth knowing:** `care_service.py` never reads Perenual's
+edibility fields (`edible_fruit`/`edible_leaf`). Photo-based species ID isn't reliable
+enough to safely tell someone whether a wild plant is edible — the most dangerous
+mix-ups are between edible plants and toxic look-alikes in the same family, exactly
+where a ~80%-accurate classifier is most likely to be wrong. Pet-toxicity stays in
+scope since the worst case there is low-stakes and recoverable.
 
 Three signals ship in Phase 1:
 

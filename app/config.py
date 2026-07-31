@@ -8,12 +8,14 @@ from functools import lru_cache
 
 
 class Settings:
-    # Kindwise (Plant.id) API — used for species identification.
-    # Get a key at https://web.plant.id/ . If unset, the app runs in
-    # MOCK mode so you can build/test the rest of the pipeline without
-    # burning API credits.
-    plant_id_api_key: str = os.getenv("PLANT_ID_API_KEY", "")
-    plant_id_base_url: str = "https://api.plant.id/v3"
+    # Pl@ntNet API — used for species identification. Free of use up to
+    # 500 identification queries per day (per Pl@ntNet's own terms of
+    # use — not a trial, a genuine free tier), no card required.
+    # Get a key at https://my.plantnet.org/ (free account signup).
+    # If unset, the app runs in MOCK mode so you can build/test the rest
+    # of the pipeline without a key at all.
+    plantnet_api_key: str = os.getenv("PLANTNET_API_KEY", "")
+    plantnet_base_url: str = "https://my-api.plantnet.org/v2"
 
     # How many species candidates to return for user confirmation.
     plant_id_top_k: int = int(os.getenv("PLANT_ID_TOP_K", "3"))
@@ -23,7 +25,22 @@ class Settings:
 
     @property
     def plant_id_mock_mode(self) -> bool:
-        return not self.plant_id_api_key
+        return not self.plantnet_api_key
+
+    # Perenual API — used for care info (watering, sunlight, growth
+    # cycle, pet toxicity) once a species is identified. Free tier
+    # covers roughly the 3,000 most common species. Get a key at
+    # https://perenual.com/docs/api . If unset, runs in MOCK mode.
+    #
+    # Deliberately NOT wired up: Perenual's edible_fruit/edible_leaf
+    # fields. We only ever read poisonous_to_pets — see care_service.py
+    # for why (foraging-safety decision, not an oversight).
+    perenual_api_key: str = os.getenv("PERENUAL_API_KEY", "")
+    perenual_base_url: str = "https://perenual.com/api/v2"
+
+    @property
+    def care_mock_mode(self) -> bool:
+        return not self.perenual_api_key
 
 
 @lru_cache

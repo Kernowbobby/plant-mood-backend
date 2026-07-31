@@ -12,8 +12,9 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.schemas import ScanResponse
+from app.services.care_service import CareService
 from app.services.diagnosis_engine import diagnose
-from app.services.plant_id_service import PlantIdService
+from app.services.plantnet_service import PlantNetService
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -33,7 +34,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-plant_id_service = PlantIdService()
+plant_id_service = PlantNetService()
+care_service = CareService()
 
 
 @app.get("/health")
@@ -86,6 +88,13 @@ async def scan(
         except Exception:
             logger.exception("Species identification failed; continuing without it.")
             identification = None
+
+        if identification and identification.candidates:
+            try:
+                top_species = identification.candidates[0].name
+                identification.care = await care_service.get_care(top_species)
+            except Exception:
+                logger.exception("Care lookup failed; continuing without it.")
 
     try:
         diagnosis_result, signals = diagnose(image_byte_list)
