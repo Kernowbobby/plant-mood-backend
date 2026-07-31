@@ -38,25 +38,39 @@ class CareService:
         return await self._call_perenual(species_name)
 
     async def _call_perenual(self, species_name: str) -> CareInfo | None:
-        url = f"{self.settings.perenual_base_url}/species-list"
-        params = {"key": self.settings.perenual_api_key, "q": species_name}
+        # Perenual splits this across two endpoints: species-list is a
+        # lightweight search that only returns id/name — the actual
+        # watering/sunlight/cycle/toxicity fields live on a separate
+        # species/details/{id} call. Confirmed against Perenual's own
+        # Postman documentation after the single-call version came back
+        # with every care field empty despite a successful match.
+        list_url = f"{self.settings.perenual_base_url}/species-list"
+        list_params = {"key": self.settings.perenual_api_key, "q": species_name}
 
         try:
             async with httpx.AsyncClient(timeout=15.0) as client:
-                resp = await client.get(url, params=params)
-                resp.raise_for_status()
-                payload = resp.json()
+                list_resp = await client.get(list_url, params=list_params)
+                list_resp.raise_for_status()
+                list_payload = list_resp.json()
+
+                results = list_payload.get("data") or []
+                if not results:
+                    return None
+                species_id = results[0].get("id")
+                if species_id is None:
+                    return None
+
+                details_url = f"{self.settings.perenual_base_url}/species/details/{species_id}"
+                details_params = {"key": self.settings.perenual_api_key}
+                details_resp = await client.get(details_url, params=details_params)
+                details_resp.raise_for_status()
+                top = details_resp.json()
         except httpx.HTTPError as exc:
             logger.error("Perenual API call failed: %s", exc)
             # Fail soft: care info is a bonus, not required for the
             # core diagnosis — a failed lookup shouldn't break the scan.
             return None
 
-        results = payload.get("data") or []
-        if not results:
-            return None
-
-        top = results[0]
         sunlight = top.get("sunlight") or []
         if isinstance(sunlight, str):
             sunlight = [sunlight]
