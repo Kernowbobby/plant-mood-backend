@@ -30,7 +30,13 @@ class WikipediaService:
         if not species_name or species_name == "Unknown":
             return None
 
-        url = f"{WIKIPEDIA_SUMMARY_BASE_URL}/{quote(species_name)}"
+        # Wikipedia's own URL convention uses underscores between words
+        # (en.wikipedia.org/wiki/Phaseolus_vulgaris), not %20-encoded
+        # spaces — the REST API's title parameter expects that exact
+        # form. Confirmed as the real cause of an empty result on a
+        # very common species name during live testing.
+        title = species_name.replace(" ", "_")
+        url = f"{WIKIPEDIA_SUMMARY_BASE_URL}/{quote(title)}"
 
         try:
             async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS, follow_redirects=True) as client:
