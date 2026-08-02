@@ -8,6 +8,19 @@ from typing import Optional
 from pydantic import BaseModel, Field
 
 
+class ReferencePhoto(BaseModel):
+    """
+    A real, community-submitted photo of the identified species from
+    iNaturalist (https://www.inaturalist.org/) — genuinely free, no key,
+    backed by the California Academy of Sciences and National
+    Geographic Society. Covers any species (houseplants, vegetables,
+    trees, wild plants alike), which is what lets identification widen
+    beyond houseplants without needing a separate source per category.
+    """
+    url: str
+    attribution: Optional[str] = None  # real photographer credit — always show this alongside the image
+
+
 class SpeciesCandidate(BaseModel):
     name: str
     common_name: Optional[str] = None
@@ -36,6 +49,7 @@ class IdentifyResponse(BaseModel):
     candidates: list[SpeciesCandidate]
     is_plant_probability: float = Field(ge=0.0, le=1.0)
     care: Optional[CareInfo] = None
+    reference_photo: Optional[ReferencePhoto] = None
 
 
 class SignalScore(BaseModel):

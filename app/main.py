@@ -14,6 +14,7 @@ from app.config import get_settings
 from app.schemas import ScanResponse
 from app.services.care_service import CareService
 from app.services.diagnosis_engine import diagnose
+from app.services.inaturalist_service import INaturalistService
 from app.services.plantnet_service import PlantNetService
 
 logging.basicConfig(level=logging.INFO)
@@ -36,6 +37,7 @@ app.add_middleware(
 
 plant_id_service = PlantNetService()
 care_service = CareService()
+inaturalist_service = INaturalistService()
 
 
 @app.get("/health")
@@ -95,6 +97,10 @@ async def scan(
                 identification.care = await care_service.get_care(top_species)
             except Exception:
                 logger.exception("Care lookup failed; continuing without it.")
+            try:
+                identification.reference_photo = await inaturalist_service.get_reference_photo(top_species)
+            except Exception:
+                logger.exception("Reference photo lookup failed; continuing without it.")
 
     try:
         diagnosis_result, signals = diagnose(image_byte_list)
