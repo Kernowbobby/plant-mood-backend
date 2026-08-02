@@ -24,6 +24,13 @@ WIKIPEDIA_SUMMARY_BASE_URL = "https://en.wikipedia.org/api/rest_v1/page/summary"
 _TIMEOUT_SECONDS = 10.0
 _MAX_EXTRACT_CHARS = 500  # keep it to a short blurb, not a full article dump
 
+# Wikipedia's API rejects requests with no identifying User-Agent —
+# this is documented policy, not a fluke. Confirmed as the cause of a
+# 403 Forbidden during live testing, right after the underscore fix
+# resolved the previous (different) bug. Format follows Wikimedia's
+# own guidance: app name + a contact point.
+_USER_AGENT = "PlantMood/1.0 (https://github.com/Kernowbobby/plant-mood-backend)"
+
 
 class WikipediaService:
     async def get_summary(self, species_name: str) -> WikiSummary | None:
@@ -39,8 +46,9 @@ class WikipediaService:
         url = f"{WIKIPEDIA_SUMMARY_BASE_URL}/{quote(title)}"
 
         try:
+            headers = {"User-Agent": _USER_AGENT}
             async with httpx.AsyncClient(timeout=_TIMEOUT_SECONDS, follow_redirects=True) as client:
-                resp = await client.get(url)
+                resp = await client.get(url, headers=headers)
                 if resp.status_code == 404:
                     # No article under this exact name — not an error,
                     # just nothing to show. Common for cultivars/hybrids.
