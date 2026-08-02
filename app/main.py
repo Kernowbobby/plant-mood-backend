@@ -16,6 +16,7 @@ from app.services.care_service import CareService
 from app.services.diagnosis_engine import diagnose
 from app.services.inaturalist_service import INaturalistService
 from app.services.plantnet_service import PlantNetService
+from app.services.wikipedia_service import WikipediaService
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -38,6 +39,7 @@ app.add_middleware(
 plant_id_service = PlantNetService()
 care_service = CareService()
 inaturalist_service = INaturalistService()
+wikipedia_service = WikipediaService()
 
 
 @app.get("/health")
@@ -101,6 +103,11 @@ async def scan(
                 identification.reference_photo = await inaturalist_service.get_reference_photo(top_species)
             except Exception:
                 logger.exception("Reference photo lookup failed; continuing without it.")
+            if identification.care is None:
+                try:
+                    identification.wiki_summary = await wikipedia_service.get_summary(top_species)
+                except Exception:
+                    logger.exception("Wikipedia fallback lookup failed; continuing without it.")
 
     try:
         diagnosis_result, signals = diagnose(image_byte_list)

@@ -45,11 +45,23 @@ class CareInfo(BaseModel):
     source: str = "Perenual"
 
 
+class WikiSummary(BaseModel):
+    """
+    A short fallback description from Wikipedia, shown only when
+    Perenual's structured care data isn't available. Free, no key, and
+    — unlike iNaturalist — genuinely documented and stable, so this one
+    carries less first-deployment risk than Day 1's reference photo did.
+    """
+    extract: str
+    url: Optional[str] = None
+
+
 class IdentifyResponse(BaseModel):
     candidates: list[SpeciesCandidate]
     is_plant_probability: float = Field(ge=0.0, le=1.0)
     care: Optional[CareInfo] = None
     reference_photo: Optional[ReferencePhoto] = None
+    wiki_summary: Optional[WikiSummary] = None
 
 
 class SignalScore(BaseModel):
