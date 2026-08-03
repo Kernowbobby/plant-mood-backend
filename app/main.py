@@ -14,6 +14,7 @@ from app.config import get_settings
 from app.schemas import ScanResponse
 from app.services.care_service import CareService
 from app.services.diagnosis_engine import diagnose
+from app.services.gbif_service import GbifService
 from app.services.inaturalist_service import INaturalistService
 from app.services.plantnet_service import PlantNetService
 from app.services.wikipedia_service import WikipediaService
@@ -40,6 +41,7 @@ plant_id_service = PlantNetService()
 care_service = CareService()
 inaturalist_service = INaturalistService()
 wikipedia_service = WikipediaService()
+gbif_service = GbifService()
 
 
 @app.get("/health")
@@ -108,6 +110,11 @@ async def scan(
                     identification.wiki_summary = await wikipedia_service.get_summary(top_species)
                 except Exception:
                     logger.exception("Wikipedia fallback lookup failed; continuing without it.")
+            try:
+                top_gbif_id = identification.candidates[0].gbif_id
+                identification.taxonomy = await gbif_service.get_taxonomy(top_gbif_id)
+            except Exception:
+                logger.exception("GBIF taxonomy lookup failed; continuing without it.")
 
     try:
         diagnosis_result, signals = diagnose(image_byte_list)

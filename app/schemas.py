@@ -56,12 +56,31 @@ class WikiSummary(BaseModel):
     url: Optional[str] = None
 
 
+class GbifTaxonomy(BaseModel):
+    """
+    Extra taxonomic context from GBIF (gbif.org), fetched using the
+    gbif_id already returned alongside identification — no separate
+    name lookup needed, no key, no signup, no meaningful rate limit
+    for this kind of light use.
+    """
+    kingdom: Optional[str] = None
+    phylum: Optional[str] = None
+    plant_class: Optional[str] = None  # GBIF calls this "class"; renamed to avoid the Python keyword
+    order: Optional[str] = None
+    family: Optional[str] = None
+    genus: Optional[str] = None
+    canonical_name: Optional[str] = None
+    rank: Optional[str] = None
+    source: str = "GBIF"
+
+
 class IdentifyResponse(BaseModel):
     candidates: list[SpeciesCandidate]
     is_plant_probability: float = Field(ge=0.0, le=1.0)
     care: Optional[CareInfo] = None
     reference_photo: Optional[ReferencePhoto] = None
     wiki_summary: Optional[WikiSummary] = None
+    taxonomy: Optional[GbifTaxonomy] = None
 
 
 class SignalScore(BaseModel):
