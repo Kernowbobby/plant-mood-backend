@@ -5,6 +5,7 @@ Deliberately minimal per the project brief: one endpoint, no auth, no
 DB. The goal of this phase is a rock-solid photo -> ID -> diagnosis
 pipeline, tested in isolation, before anything else gets bolted on.
 """
+import asyncio
 import logging
 
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
@@ -58,6 +59,53 @@ async def health():
 MAX_PHOTOS_PER_SCAN = 4
 
 
+async def _fetch_care_and_wiki(top_species: str):
+    """Wiki is only fetched as a fallback when care lookup comes back
+    empty, so these two stay chained together — but this whole chain
+    now runs in parallel with reference photo, taxonomy, and diagnosis
+    rather than blocking them."""
+    care = None
+    wiki = None
+    try:
+        care = await care_service.get_care(top_species)
+    except Exception:
+        logger.exception("Care lookup failed; continuing without it.")
+    if care is None:
+        try:
+            wiki = await wikipedia_service.get_summary(top_species)
+        except Exception:
+            logger.exception("Wikipedia fallback lookup failed; continuing without it.")
+    return care, wiki
+
+
+async def _fetch_reference_photo(top_species: str):
+    try:
+        return await inaturalist_service.get_reference_photo(top_species)
+    except Exception:
+        logger.exception("Reference photo lookup failed; continuing without it.")
+        return None
+
+
+async def _fetch_taxonomy(gbif_id):
+    try:
+        return await gbif_service.get_taxonomy(gbif_id)
+    except Exception:
+        logger.exception("GBIF taxonomy lookup failed; continuing without it.")
+        return None
+
+
+async def _run_diagnosis(image_byte_list, use_ai_diagnosis, plant_probability):
+    if use_ai_diagnosis:
+        try:
+            return await ai_diagnosis_service.diagnose(image_byte_list)
+        except Exception:
+            logger.exception("AI diagnosis failed; falling back to the rule-based engine.")
+    # diagnose() is CPU-bound (OpenCV), not I/O — run it in a worker
+    # thread so it doesn't block the event loop while the other
+    # lookups are running concurrently on it.
+    return await asyncio.to_thread(diagnose, image_byte_list, is_plant_probability=plant_probability)
+
+
 @app.post("/scan", response_model=ScanResponse)
 async def scan(
     photos: list[UploadFile] = File(..., description="One to four photos of the same plant/issue."),
@@ -93,54 +141,46 @@ async def scan(
             raise HTTPException(status_code=413, detail="One of the images is too large.")
         image_byte_list.append(image_bytes)
 
+    # Identification has to run first — everything else either needs
+    # to know the species name/gbif_id, or needs is_plant_probability
+    # for the diagnosis gate. But once it's done (or skipped), every
+    # remaining lookup is independent of every other one, so they all
+    # run at the same time instead of queuing up one after another.
+    # On a typical scan this turns ~5 sequential network calls into 1.
     identification = None
     if not skip_id:
         try:
-            # Species ID runs on the first photo only — identification
-            # doesn't benefit from multiple angles the way diagnosis does.
             identification = await plant_id_service.identify(image_byte_list[0])
         except Exception:
             logger.exception("Species identification failed; continuing without it.")
             identification = None
 
-        if identification and identification.candidates:
-            try:
-                top_species = identification.candidates[0].name
-                identification.care = await care_service.get_care(top_species)
-            except Exception:
-                logger.exception("Care lookup failed; continuing without it.")
-            try:
-                identification.reference_photo = await inaturalist_service.get_reference_photo(top_species)
-            except Exception:
-                logger.exception("Reference photo lookup failed; continuing without it.")
-            if identification.care is None:
-                try:
-                    identification.wiki_summary = await wikipedia_service.get_summary(top_species)
-                except Exception:
-                    logger.exception("Wikipedia fallback lookup failed; continuing without it.")
-            try:
-                top_gbif_id = identification.candidates[0].gbif_id
-                identification.taxonomy = await gbif_service.get_taxonomy(top_gbif_id)
-            except Exception:
-                logger.exception("GBIF taxonomy lookup failed; continuing without it.")
-
     plant_probability = identification.is_plant_probability if identification else None
 
-    if use_ai_diagnosis:
-        try:
-            diagnosis_result, signals = await ai_diagnosis_service.diagnose(image_byte_list)
-        except Exception:
-            logger.exception("AI diagnosis failed; falling back to the rule-based engine.")
-            try:
-                diagnosis_result, signals = diagnose(image_byte_list, is_plant_probability=plant_probability)
-            except ValueError as exc:
-                raise HTTPException(status_code=400, detail=str(exc))
-    else:
-        try:
-            diagnosis_result, signals = diagnose(image_byte_list, is_plant_probability=plant_probability)
-        except ValueError as exc:
-            # Raised by image decoding in image_analysis._decode
-            raise HTTPException(status_code=400, detail=str(exc))
+    diagnosis_task = _run_diagnosis(image_byte_list, use_ai_diagnosis, plant_probability)
+
+    try:
+        if identification and identification.candidates:
+            top_species = identification.candidates[0].name
+            top_gbif_id = identification.candidates[0].gbif_id
+            care_wiki_task = _fetch_care_and_wiki(top_species)
+            photo_task = _fetch_reference_photo(top_species)
+            taxonomy_task = _fetch_taxonomy(top_gbif_id)
+
+            diagnosis_outcome, (care, wiki), reference_photo, taxonomy = await asyncio.gather(
+                diagnosis_task, care_wiki_task, photo_task, taxonomy_task,
+            )
+            identification.care = care
+            identification.wiki_summary = wiki
+            identification.reference_photo = reference_photo
+            identification.taxonomy = taxonomy
+        else:
+            diagnosis_outcome = await diagnosis_task
+    except ValueError as exc:
+        # Raised by image decoding in image_analysis._decode
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    diagnosis_result, signals = diagnosis_outcome
 
     return ScanResponse(
         identification=identification,
