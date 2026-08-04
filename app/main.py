@@ -116,8 +116,10 @@ async def scan(
             except Exception:
                 logger.exception("GBIF taxonomy lookup failed; continuing without it.")
 
+    plant_probability = identification.is_plant_probability if identification else None
+
     try:
-        diagnosis_result, signals = diagnose(image_byte_list)
+        diagnosis_result, signals = diagnose(image_byte_list, is_plant_probability=plant_probability)
     except ValueError as exc:
         # Raised by image decoding in image_analysis._decode
         raise HTTPException(status_code=400, detail=str(exc))

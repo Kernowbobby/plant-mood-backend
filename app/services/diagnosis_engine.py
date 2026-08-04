@@ -26,6 +26,15 @@ SIGNAL_WEIGHTS = {
 
 CONFIDENCE_FLOOR_FOR_DIAGNOSIS = 0.3  # below this, we call it "unclear"
 
+# Below this, identification itself doesn't think there's a plant in
+# frame — the colour/texture signals below have no way to know that,
+# so they'll happily score a wall, a hand, or a rug as "overwatered"
+# with high confidence. Caught a live case: a photo of framed prints
+# came back "Underwatered, 85% confidence." This check runs first and
+# skips signal-scoring entirely rather than letting it produce a
+# confident-sounding but meaningless result.
+NOT_A_PLANT_PROBABILITY_THRESHOLD = 0.4
+
 
 def _run_signals(image_bytes: bytes) -> list[SignalScore]:
     signals: list[SignalScore] = []
@@ -69,16 +78,46 @@ def _diagnose_single(image_bytes: bytes) -> tuple[str, float, list[SignalScore]]
     return issue_key, confidence, signals
 
 
-def diagnose(images: list[bytes]) -> tuple[DiagnosisResult, list[SignalScore]]:
+def diagnose(
+    images: list[bytes],
+    is_plant_probability: float | None = None,
+) -> tuple[DiagnosisResult, list[SignalScore]]:
     """
     Accepts one or more photos. Each is diagnosed independently, then
     reconciled: photos that agree on the same issue reinforce each
     other's confidence; a lone outlier photo doesn't get full credit.
     With a single photo this reduces to the old single-image behaviour
     exactly (agreement_ratio is always 1.0 with nothing to disagree with).
+
+    is_plant_probability, when provided by the identification step, is
+    checked before any signal scoring runs. Below the threshold, we
+    skip straight to a "not_a_plant" result rather than let the
+    colour/texture heuristics — which have no concept of "is this even
+    a plant" — produce a confident-sounding but meaningless diagnosis.
     """
     if not images:
         raise ValueError("At least one photo is required.")
+
+    if (
+        is_plant_probability is not None
+        and is_plant_probability < NOT_A_PLANT_PROBABILITY_THRESHOLD
+    ):
+        entry = ISSUE_LIBRARY["not_a_plant"]
+        voice_lines = entry.get("voice_lines") or [""]
+        result = DiagnosisResult(
+            issue_key="not_a_plant",
+            issue_label=entry["label"],
+            mood_emoji=entry["mood_emoji"],
+            confidence=round(1.0 - is_plant_probability, 2),
+            summary=entry["summary"],
+            fix_steps=entry["fix_steps"],
+            manual_check_recommended=False,
+            supporting_photo_count=0,
+            total_photo_count=len(images),
+            agreement_ratio=0.0,
+            plant_voice_line=random.choice(voice_lines),
+        )
+        return result, []
 
     per_image: list[tuple[str, float, list[SignalScore]]] = []
     for idx, image_bytes in enumerate(images):

@@ -117,6 +117,20 @@ ISSUE_LIBRARY: dict[str, dict] = {
             "Green, hydrated, unbothered. This is the dream.",
         ],
     },
+    "not_a_plant": {
+        "label": "Doesn't Look Like a Plant",
+        "mood_emoji": "🖼️",
+        "summary": "This photo doesn't look like it contains a plant, so a watering/health diagnosis wouldn't be reliable here.",
+        "fix_steps": [
+            "Try a photo focused closely on the plant itself, with good lighting.",
+            "Make sure the leaves take up most of the frame.",
+        ],
+        "voice_lines": [
+            "I don't think that's me in that photo...",
+            "Not sure who that is, but it's not a plant.",
+            "Try pointing the camera at an actual plant next time?",
+        ],
+    },
     "unclear": {
         "label": "Inconclusive",
         "mood_emoji": "🤔",
