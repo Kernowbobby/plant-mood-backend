@@ -48,7 +48,7 @@ plant, taken by an amateur gardener on their phone. Diagnose its condition.
 
 Respond with ONLY a JSON object, no other text, in exactly this shape:
 {
-  "issue_key": one of {issues},
+  "issue_key": one of """ + str(_KNOWN_ISSUES) + """,
   "issue_label": short human-readable label, e.g. "Overwatered",
   "mood_emoji": a single emoji capturing the plant's "mood",
   "confidence": a number between 0 and 1,
@@ -57,11 +57,12 @@ Respond with ONLY a JSON object, no other text, in exactly this shape:
   "manual_check_recommended": true only if the photo is genuinely ambiguous,
   "plant_voice_line": a short, first-person, slightly humorous line as if \
 the plant itself were speaking about how it feels
+}
 
 Be honest about uncertainty — use "unclear" with modest confidence rather \
 than a confident-sounding guess if the photo doesn't show enough to tell. \
 If the photo doesn't contain a plant at all, use issue_key "unclear" and \
-say so plainly in the summary.""".format(issues=_KNOWN_ISSUES)
+say so plainly in the summary."""
 
 
 class AiDiagnosisService:
