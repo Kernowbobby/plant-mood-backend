@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.schemas import ScanResponse
+from app.services.ai_diagnosis_service import AiDiagnosisService
 from app.services.care_service import CareService
 from app.services.diagnosis_engine import diagnose
 from app.services.gbif_service import GbifService
@@ -42,6 +43,7 @@ care_service = CareService()
 inaturalist_service = INaturalistService()
 wikipedia_service = WikipediaService()
 gbif_service = GbifService()
+ai_diagnosis_service = AiDiagnosisService()
 
 
 @app.get("/health")
@@ -62,6 +64,12 @@ async def scan(
     skip_id: bool = Query(
         default=False,
         description="If true, skip species identification and go straight to diagnosis.",
+    ),
+    use_ai_diagnosis: bool = Query(
+        default=False,
+        description="Phase 2, testing only: use AI vision diagnosis instead of the "
+                    "rule-based colour/texture engine. Defaults to mock mode unless "
+                    "ANTHROPIC_API_KEY is set on the server — see ai_diagnosis_service.py.",
     ),
 ):
     settings = get_settings()
@@ -118,11 +126,21 @@ async def scan(
 
     plant_probability = identification.is_plant_probability if identification else None
 
-    try:
-        diagnosis_result, signals = diagnose(image_byte_list, is_plant_probability=plant_probability)
-    except ValueError as exc:
-        # Raised by image decoding in image_analysis._decode
-        raise HTTPException(status_code=400, detail=str(exc))
+    if use_ai_diagnosis:
+        try:
+            diagnosis_result, signals = await ai_diagnosis_service.diagnose(image_byte_list)
+        except Exception:
+            logger.exception("AI diagnosis failed; falling back to the rule-based engine.")
+            try:
+                diagnosis_result, signals = diagnose(image_byte_list, is_plant_probability=plant_probability)
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc))
+    else:
+        try:
+            diagnosis_result, signals = diagnose(image_byte_list, is_plant_probability=plant_probability)
+        except ValueError as exc:
+            # Raised by image decoding in image_analysis._decode
+            raise HTTPException(status_code=400, detail=str(exc))
 
     return ScanResponse(
         identification=identification,

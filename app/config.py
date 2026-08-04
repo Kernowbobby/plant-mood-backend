@@ -42,6 +42,20 @@ class Settings:
     def care_mock_mode(self) -> bool:
         return not self.perenual_api_key
 
+    # Anthropic API — used for AI vision-based diagnosis (Phase 2),
+    # sending the photo directly to a vision model rather than relying
+    # on the hand-written colour/texture heuristics in
+    # diagnosis_engine.py. Get a key at https://platform.claude.com .
+    # If unset, runs in MOCK mode — this is the default, and stays the
+    # default until deliberately switched on with a real key. No cost
+    # is incurred in mock mode; every call returns a canned response.
+    anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
+    ai_diagnosis_model: str = os.getenv("AI_DIAGNOSIS_MODEL", "claude-haiku-4-5-20251001")
+
+    @property
+    def ai_diagnosis_mock_mode(self) -> bool:
+        return not self.anthropic_api_key
+
 
 @lru_cache
 def get_settings() -> Settings:
