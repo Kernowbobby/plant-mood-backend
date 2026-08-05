@@ -40,7 +40,10 @@ logger = logging.getLogger(__name__)
 
 _ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages"
 _ANTHROPIC_API_VERSION = "2023-06-01"
-_TIMEOUT_SECONDS = 30.0
+_TIMEOUT_SECONDS = 90.0  # first use of a schema compiles it server-side on Anthropic's end,
+# which can genuinely take a while — 30s was too eager and caused silent,
+# untraceable-looking fallbacks to the rule-based engine. See Android's
+# ApiClient.kt for the matching client-side timeout.
 
 # Keep in sync with issue_library.py's keys — see that file for why.
 _KNOWN_ISSUES = [
