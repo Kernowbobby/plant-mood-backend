@@ -141,6 +141,15 @@ def _format_candidates(candidates: list[SpeciesCandidate]) -> str:
         label = f"{c.name}" + (f" ({c.common_name})" if c.common_name else "")
         lines.append(f"- {label} — {c.probability * 100:.0f}% confidence")
     return "\n".join(lines)
+  def _format_wiki(wiki_summary: str | None) -> str:
+    if not wiki_summary:
+        return ""
+    return ("\n\nHere is a general Wikipedia summary for this species, provided as background only:\n"
+            f'"{wiki_summary}"\n\n'
+            "Only mention something from this background if it is genuinely relevant to your "
+            "observations or advice (e.g. a known growth habit that explains what you're seeing). "
+            "Do not summarise or quote this text for its own sake, and ignore it entirely if it "
+            "doesn't help explain what's in the photo.")
 
 
 class AiDiagnosisService:
@@ -151,6 +160,7 @@ class AiDiagnosisService:
         self,
         images: list[bytes],
         candidates: list[SpeciesCandidate] | None = None,
+        wiki_summary: str | None = None,
     ) -> tuple[DiagnosisResult, list[SignalScore], AiInsights]:
         if not images:
             raise ValueError("At least one photo is required.")
@@ -159,7 +169,7 @@ class AiDiagnosisService:
             return self._mock_diagnose(images)
 
         try:
-            return await self._real_diagnose(images, candidates or [])
+            return await self._real_diagnose(images, candidates or [], wiki_summary)
         except Exception:
             logger.exception("AI diagnosis call failed; caller should fall back to the rule-based engine.")
             raise
@@ -212,6 +222,7 @@ class AiDiagnosisService:
         self,
         images: list[bytes],
         candidates: list[SpeciesCandidate],
+        wiki_summary: str | None = None,
     ) -> tuple[DiagnosisResult, list[SignalScore], AiInsights]:
         content: list[dict] = []
         for img_bytes in images:
@@ -223,7 +234,7 @@ class AiDiagnosisService:
                     "data": base64.b64encode(img_bytes).decode("ascii"),
                 },
             })
-        prompt = _DIAGNOSIS_PROMPT_HEADER + _format_candidates(candidates)
+        prompt = _DIAGNOSIS_PROMPT_HEADER + _format_candidates(candidates) + _format_wiki(wiki_summary)
         content.append({"type": "text", "text": prompt})
 
         headers = {
