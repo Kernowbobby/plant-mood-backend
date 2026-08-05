@@ -94,16 +94,19 @@ async def _fetch_taxonomy(gbif_id):
         return None
 
 
-async def _run_diagnosis(image_byte_list, use_ai_diagnosis, plant_probability):
+async def _run_diagnosis(image_byte_list, use_ai_diagnosis, plant_probability, candidates):
     if use_ai_diagnosis:
         try:
-            return await ai_diagnosis_service.diagnose(image_byte_list)
+            result, signals, insights = await ai_diagnosis_service.diagnose(image_byte_list, candidates)
+            return result, signals, insights
         except Exception:
             logger.exception("AI diagnosis failed; falling back to the rule-based engine.")
     # diagnose() is CPU-bound (OpenCV), not I/O — run it in a worker
     # thread so it doesn't block the event loop while the other
-    # lookups are running concurrently on it.
-    return await asyncio.to_thread(diagnose, image_byte_list, is_plant_probability=plant_probability)
+    # lookups are running concurrently on it. Rule-based has no
+    # concept of ai_insights, so that slot is always None here.
+    result, signals = await asyncio.to_thread(diagnose, image_byte_list, is_plant_probability=plant_probability)
+    return result, signals, None
 
 
 @app.post("/scan", response_model=ScanResponse)
@@ -156,8 +159,9 @@ async def scan(
             identification = None
 
     plant_probability = identification.is_plant_probability if identification else None
+    candidates = identification.candidates if identification else []
 
-    diagnosis_task = _run_diagnosis(image_byte_list, use_ai_diagnosis, plant_probability)
+    diagnosis_task = _run_diagnosis(image_byte_list, use_ai_diagnosis, plant_probability, candidates)
 
     try:
         if identification and identification.candidates:
@@ -180,10 +184,11 @@ async def scan(
         # Raised by image decoding in image_analysis._decode
         raise HTTPException(status_code=400, detail=str(exc))
 
-    diagnosis_result, signals = diagnosis_outcome
+    diagnosis_result, signals, ai_insights = diagnosis_outcome
 
     return ScanResponse(
         identification=identification,
         diagnosis=diagnosis_result,
         signals=signals,
+        ai_insights=ai_insights,
     )

@@ -104,9 +104,33 @@ class DiagnosisResult(BaseModel):
     total_photo_count: int = 1
     agreement_ratio: float = Field(default=1.0, ge=0.0, le=1.0)
     plant_voice_line: str = ""  # short first-person quip from the plant's "perspective"
+    # Below: AI-diagnosis-only fields. Left at their defaults (empty
+    # list / None / False) by the rule-based engine, which has no
+    # concept of "what did I literally observe" separate from "what's
+    # my verdict" — that separation is exactly what a vision model
+    # can do that colour/texture heuristics can't.
+    observations: list[str] = Field(default_factory=list)  # what was actually seen, kept separate from the verdict
+    uncertainty_reason: Optional[str] = None  # filled in when confidence is low, explaining why
+    follow_up_photo_needed: bool = False  # true when the photo itself is the limiting factor (blur, distance, light)
+
+
+class AiInsights(BaseModel):
+    """
+    Extra species-level detail only the AI vision path can offer —
+    kept separate from IdentifyResponse's authoritative, trained-model
+    identification data so the two are never confused with each other.
+    Only populated when use_ai_diagnosis=true and identification
+    succeeded.
+    """
+    species_verification_note: Optional[str] = None  # AI's read on PlantNet's candidate list, e.g. "candidate 1 fits best"
+    variety_guess: Optional[str] = None  # cultivar-level guess, e.g. "possibly a Lollo Rosso lettuce" — explicitly a guess, not authoritative
+    soil_type_guidance: Optional[str] = None
+    bee_friendly: Optional[str] = None  # "yes" | "no" | "unsure"
+    bee_friendly_reason: Optional[str] = None
 
 
 class ScanResponse(BaseModel):
     identification: Optional[IdentifyResponse] = None
     diagnosis: DiagnosisResult
     signals: list[SignalScore]  # transparency: what voted for what
+    ai_insights: Optional[AiInsights] = None
