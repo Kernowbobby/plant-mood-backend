@@ -141,8 +141,7 @@ def _format_candidates(candidates: list[SpeciesCandidate]) -> str:
         label = f"{c.name}" + (f" ({c.common_name})" if c.common_name else "")
         lines.append(f"- {label} — {c.probability * 100:.0f}% confidence")
     return "\n".join(lines)
-  def _format_wiki(wiki_summary: str | None) -> str:
-    if not wiki_summary:
+def _format_wiki(wiki_summary: str | None) -> str:    if not wiki_summary:
         return ""
     return ("\n\nHere is a general Wikipedia summary for this species, provided as background only:\n"
             f'"{wiki_summary}"\n\n'
