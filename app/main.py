@@ -94,10 +94,10 @@ async def _fetch_taxonomy(gbif_id):
         return None
 
 
-async def _run_diagnosis(image_byte_list, use_ai_diagnosis, plant_probability, candidates):
+async def _run_diagnosis(image_byte_list, use_ai_diagnosis, plant_probability, candidates, wiki_summary=None):
     if use_ai_diagnosis:
         try:
-            result, signals, insights = await ai_diagnosis_service.diagnose(image_byte_list, candidates)
+            result, signals, insights = await ai_diagnosis_service.diagnose(image_byte_list, candidates, wiki_summary)
             return result, signals, insights
         except Exception:
             logger.exception("AI diagnosis failed; falling back to the rule-based engine.")
@@ -167,18 +167,28 @@ async def scan(
         if identification and identification.candidates:
             top_species = identification.candidates[0].name
             top_gbif_id = identification.candidates[0].gbif_id
-            care_wiki_task = _fetch_care_and_wiki(top_species)
+
+            # Wiki has to be fetched *before* diagnosis now, so the AI can
+            # actually read it — this is the one part of the pipeline that
+            # can no longer be fully parallel. Photo and taxonomy are
+            # unaffected and still run alongside diagnosis.
+            care, wiki = await _fetch_care_and_wiki(top_species)
+
+            diagnosis_task = _run_diagnosis(
+                image_byte_list, use_ai_diagnosis, plant_probability, candidates, wiki,
+            )
             photo_task = _fetch_reference_photo(top_species)
             taxonomy_task = _fetch_taxonomy(top_gbif_id)
 
-            diagnosis_outcome, (care, wiki), reference_photo, taxonomy = await asyncio.gather(
-                diagnosis_task, care_wiki_task, photo_task, taxonomy_task,
+            diagnosis_outcome, reference_photo, taxonomy = await asyncio.gather(
+                diagnosis_task, photo_task, taxonomy_task,
             )
             identification.care = care
             identification.wiki_summary = wiki
             identification.reference_photo = reference_photo
             identification.taxonomy = taxonomy
         else:
+            diagnosis_task = _run_diagnosis(image_byte_list, use_ai_diagnosis, plant_probability, candidates)
             diagnosis_outcome = await diagnosis_task
     except ValueError as exc:
         # Raised by image decoding in image_analysis._decode
