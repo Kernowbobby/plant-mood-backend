@@ -298,8 +298,12 @@ class AiDiagnosisService:
             observations=parsed.get("observations", []),
             uncertainty_reason=parsed.get("uncertainty_reason"),
             follow_up_photo_needed=bool(parsed.get("follow_up_photo_needed", False)),
+            follow_up_photo_instruction=parsed.get("follow_up_photo_instruction"),
         )
-        signals = [SignalScore(
+        if result.follow_up_photo_needed and not result.follow_up_photo_instruction:
+    result.follow_up_photo_instruction = result.uncertainty_reason or "Please take a closer, clearer photo of the affected area."
+  
+signals = [SignalScore(
             signal_name="ai_vision",
             issue=issue_key,
             confidence=result.confidence,
