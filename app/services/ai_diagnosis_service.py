@@ -311,7 +311,8 @@ signals = [SignalScore(
                   f"{len(result.observations)} observation(s) noted.",
             image_index=0,
         )]
-        insights = AiInsights(
+  
+       insights = AiInsights(
             species_verification_note=parsed.get("species_verification_note"),
             variety_guess=parsed.get("variety_guess"),
             soil_type_guidance=parsed.get("soil_type_guidance"),
