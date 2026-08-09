@@ -136,11 +136,12 @@ Be honest about uncertainty — a modest confidence with a clear uncertainty_rea
 useful than a confident-sounding guess. If the photo doesn't contain a plant at all, or is too \
 blurry/distant/poorly lit to assess, say so plainly rather than forcing a diagnosis.
 If you cannot confidently distinguish between two or more meaningfully different diagnoses
-(e.g. which pest, which disease, deficiency vs. early disease) from what's visible, and a
-specific close-up would resolve that ambiguity, set follow_up_photo_needed to true and give a
-precise follow_up_photo_instruction — name the exact plant part, what to look for, and any
-framing guidance (e.g. "underside of a yellowing leaf, close enough to see any insects or
-eggs"). Do not request a follow-up photo just because you're not 100% certain — only when a
+(e.g. which pest, which disease, deficiency vs. early disease) from what's visible, ...and a 
+specific close-up would resolve that ambiguity, set follow_up_photo_needed to true.
+Whenever follow_up_photo_needed is true, follow_up_photo_instruction is REQUIRED and must never
+be null — give precise guidance: name the exact plant part, what to look for, and any framing
+guidance (e.g. "underside of a yellowing leaf, close enough to see any insects or eggs"). 
+Do not request a follow-up photo just because you're not 100% certain — only when a
 specific photo would genuinely resolve a real ambiguity. If you can identify the plant and see
 a clear issue, give your best diagnosis with an honest confidence level instead."""
 
