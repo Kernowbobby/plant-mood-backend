@@ -87,6 +87,12 @@ _RESPONSE_SCHEMA = {
             "description": "True if the photo itself is the limiting factor — too blurry, too far away, "
                             "bad lighting, only part of the plant visible — rather than the plant's condition.",
         },
+        "follow_up_photo_instruction": {
+            "type": ["string", "null"],
+            "description": "Only when follow_up_photo_needed is true: precise guidance for the next photo — "
+                    "name the exact plant part and what to look for, e.g. 'underside of a yellowing "
+                    "leaf, close enough to see any insects or eggs'. Null otherwise.",
+        },
         "variety_guess": {
             "type": ["string", "null"],
             "description": "A cultivar/variety-level guess if the photo gives enough detail to attempt "
