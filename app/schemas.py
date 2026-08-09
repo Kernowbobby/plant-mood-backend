@@ -112,6 +112,7 @@ class DiagnosisResult(BaseModel):
     observations: list[str] = Field(default_factory=list)  # what was actually seen, kept separate from the verdict
     uncertainty_reason: Optional[str] = None  # filled in when confidence is low, explaining why
     follow_up_photo_needed: bool = False  # true when the photo itself is the limiting factor (blur, distance, light)
+    follow_up_photo_instruction: Optional[str] = None  # specific guidance for the second photo, e.g. "underside of an affected leaf, close up" — set only when follow_up_photo_needed is True
 
 
 class AiInsights(BaseModel):
