@@ -301,7 +301,7 @@ class AiDiagnosisService:
             follow_up_photo_instruction=parsed.get("follow_up_photo_instruction"),
         )
         if result.follow_up_photo_needed and not result.follow_up_photo_instruction:
-    result.follow_up_photo_instruction = result.uncertainty_reason or "Please take a closer, clearer photo of the affected area."
+                        result.follow_up_photo_instruction = result.uncertainty_reason or "Please take a closer, clearer photo of the affected area."
   
 signals = [SignalScore(
             signal_name="ai_vision",
