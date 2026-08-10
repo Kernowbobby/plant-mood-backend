@@ -301,9 +301,9 @@ class AiDiagnosisService:
             follow_up_photo_instruction=parsed.get("follow_up_photo_instruction"),
         )
         if result.follow_up_photo_needed and not result.follow_up_photo_instruction:
-                        result.follow_up_photo_instruction = result.uncertainty_reason or "Please take a closer, clearer photo of the affected area."
-  
-signals = [SignalScore(
+            result.follow_up_photo_instruction = result.uncertainty_reason or "Please take a closer, clearer photo of the affected area."
+
+        signals = [SignalScore(
             signal_name="ai_vision",
             issue=issue_key,
             confidence=result.confidence,
@@ -311,8 +311,8 @@ signals = [SignalScore(
                   f"{len(result.observations)} observation(s) noted.",
             image_index=0,
         )]
-  
-       insights = AiInsights(
+
+        insights = AiInsights(
             species_verification_note=parsed.get("species_verification_note"),
             variety_guess=parsed.get("variety_guess"),
             soil_type_guidance=parsed.get("soil_type_guidance"),
