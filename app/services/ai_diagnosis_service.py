@@ -7,7 +7,7 @@ Uses Anthropic's Structured Outputs feature (output_config.format,
 generally available on Haiku 4.5 and later) rather than asking for
 JSON in free text and hoping — the API constrains generation so the
 response is guaranteed to match the schema below. No more stripping
-```json fences or catching json.loads failures.
+fenced code markers or catching json.loads failures.
 
 Design choices, informed by outside review (two independent AI
 reviews of this project both converged on these points):
@@ -348,6 +348,3 @@ class AiDiagnosisService:
             weather_comment=parsed.get("weather_comment"),
         )
         return result, signals, insights
-```
-
-Commit that to `main`. Let me know when it's done and we'll move on to the final file, `main.py`.
