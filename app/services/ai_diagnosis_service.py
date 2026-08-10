@@ -114,6 +114,14 @@ _RESPONSE_SCHEMA = {
             "description": "A short, friendly reason for the bee_friendly answer, e.g. 'open, "
                             "nectar-rich flowers that pollinators favour'. Null if 'unsure'.",
         },
+        "weather_comment": {
+            "type": ["string", "null"],
+            "description": "A short, friendly, ONE-sentence comment tying today's or tomorrow's weather "
+                            "(given below, if provided) to practical gardening advice for this plant — "
+                            "e.g. 'Dry and mild today, good day to check the soil' or 'Rain's due "
+                            "tomorrow, you can probably skip watering'. Only fill this in if weather "
+                            "information was given below. Null if no weather information was provided.",
+        },
         "plant_voice_line": {
             "type": "string",
             "description": "A short, first-person, slightly humorous line as if the plant itself were "
@@ -124,7 +132,7 @@ _RESPONSE_SCHEMA = {
         "observations", "species_verification_note", "issue_key", "issue_label", "mood_emoji",
         "confidence", "summary", "fix_steps", "manual_check_recommended", "uncertainty_reason",
         "follow_up_photo_needed", "variety_guess", "soil_type_guidance", "bee_friendly",
-        "bee_friendly_reason", "plant_voice_line",
+        "bee_friendly_reason", "weather_comment", "plant_voice_line",
     ],
 }
 
@@ -163,6 +171,17 @@ def _format_wiki(wiki_summary: str | None) -> str:
             "doesn't help explain what's in the photo.")
 
 
+def _format_weather(weather_summary: str | None) -> str:
+    if not weather_summary:
+        return ""
+    return ("\n\nHere is the current weather at the plant's location:\n"
+            f'"{weather_summary}"\n\n'
+            "If — and only if — this weather is genuinely relevant to caring for this plant right now, "
+            "fill in weather_comment with one short, friendly sentence of practical advice (e.g. skip "
+            "watering if rain's coming, or a note about heat stress on a hot day). Leave weather_comment "
+            "null if the weather doesn't suggest anything worth saying.")
+
+
 class AiDiagnosisService:
     def __init__(self) -> None:
         self._settings = get_settings()
@@ -172,6 +191,7 @@ class AiDiagnosisService:
         images: list[bytes],
         candidates: list[SpeciesCandidate] | None = None,
         wiki_summary: str | None = None,
+        weather_summary: str | None = None,
     ) -> tuple[DiagnosisResult, list[SignalScore], AiInsights]:
         if not images:
             raise ValueError("At least one photo is required.")
@@ -180,7 +200,7 @@ class AiDiagnosisService:
             return self._mock_diagnose(images)
 
         try:
-            return await self._real_diagnose(images, candidates or [], wiki_summary)
+            return await self._real_diagnose(images, candidates or [], wiki_summary, weather_summary)
         except Exception:
             logger.exception("AI diagnosis call failed; caller should fall back to the rule-based engine.")
             raise
@@ -223,6 +243,7 @@ class AiDiagnosisService:
             soil_type_guidance="[MOCK] well-draining potting mix.",
             bee_friendly="unsure",
             bee_friendly_reason="[MOCK RESPONSE]",
+            weather_comment="[MOCK] Dry and mild today — good day to check the soil.",
         )
         return result, signals, insights
 
@@ -234,6 +255,7 @@ class AiDiagnosisService:
         images: list[bytes],
         candidates: list[SpeciesCandidate],
         wiki_summary: str | None = None,
+        weather_summary: str | None = None,
     ) -> tuple[DiagnosisResult, list[SignalScore], AiInsights]:
         content: list[dict] = []
         for img_bytes in images:
@@ -245,7 +267,12 @@ class AiDiagnosisService:
                     "data": base64.b64encode(img_bytes).decode("ascii"),
                 },
             })
-        prompt = _DIAGNOSIS_PROMPT_HEADER + _format_candidates(candidates) + _format_wiki(wiki_summary)
+        prompt = (
+            _DIAGNOSIS_PROMPT_HEADER
+            + _format_candidates(candidates)
+            + _format_wiki(wiki_summary)
+            + _format_weather(weather_summary)
+        )
         content.append({"type": "text", "text": prompt})
 
         headers = {
@@ -318,5 +345,9 @@ class AiDiagnosisService:
             soil_type_guidance=parsed.get("soil_type_guidance"),
             bee_friendly=parsed.get("bee_friendly"),
             bee_friendly_reason=parsed.get("bee_friendly_reason"),
+            weather_comment=parsed.get("weather_comment"),
         )
         return result, signals, insights
+```
+
+Commit that to `main`. Let me know when it's done and we'll move on to the final file, `main.py`.
