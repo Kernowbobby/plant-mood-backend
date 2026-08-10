@@ -128,6 +128,7 @@ class AiInsights(BaseModel):
     soil_type_guidance: Optional[str] = None
     bee_friendly: Optional[str] = None  # "yes" | "no" | "unsure"
     bee_friendly_reason: Optional[str] = None
+    weather_comment: Optional[str] = None  # short, friendly note tied to current/tomorrow's weather at the scan location — only set when latitude/longitude were provided
 
 
 class ScanResponse(BaseModel):
