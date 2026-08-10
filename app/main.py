@@ -20,6 +20,7 @@ from app.services.gbif_service import GbifService
 from app.services.inaturalist_service import INaturalistService
 from app.services.plantnet_service import PlantNetService
 from app.services.wikipedia_service import WikipediaService
+from app.services.weather_service import WeatherService
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -45,6 +46,7 @@ inaturalist_service = INaturalistService()
 wikipedia_service = WikipediaService()
 gbif_service = GbifService()
 ai_diagnosis_service = AiDiagnosisService()
+weather_service = WeatherService()
 
 
 @app.get("/health")
@@ -94,10 +96,24 @@ async def _fetch_taxonomy(gbif_id):
         return None
 
 
-async def _run_diagnosis(image_byte_list, use_ai_diagnosis, plant_probability, candidates, wiki_summary=None):
+async def _fetch_weather(latitude: float | None, longitude: float | None):
+    if latitude is None or longitude is None:
+        return None
+    try:
+        return await weather_service.get_summary(latitude, longitude)
+    except Exception:
+        logger.exception("Weather lookup failed; continuing without it.")
+        return None
+
+
+async def _run_diagnosis(
+    image_byte_list, use_ai_diagnosis, plant_probability, candidates, wiki_summary=None, weather_summary=None,
+):
     if use_ai_diagnosis:
         try:
-            result, signals, insights = await ai_diagnosis_service.diagnose(image_byte_list, candidates, wiki_summary)
+            result, signals, insights = await ai_diagnosis_service.diagnose(
+                image_byte_list, candidates, wiki_summary, weather_summary,
+            )
             return result, signals, insights
         except Exception:
             logger.exception("AI diagnosis failed; falling back to the rule-based engine.")
@@ -122,6 +138,15 @@ async def scan(
                     "rule-based colour/texture engine. Defaults to mock mode unless "
                     "ANTHROPIC_API_KEY is set on the server — see ai_diagnosis_service.py.",
     ),
+    latitude: float | None = Query(
+        default=None,
+        description="Optional. Used to fetch local weather context for the AI diagnosis prompt, "
+                    "and later for hemisphere/season awareness. Ignored entirely if omitted.",
+    ),
+    longitude: float | None = Query(
+        default=None,
+        description="Optional, paired with latitude — see above.",
+    ),
 ):
     settings = get_settings()
 
@@ -144,6 +169,11 @@ async def scan(
             raise HTTPException(status_code=413, detail="One of the images is too large.")
         image_byte_list.append(image_bytes)
 
+    # Started now so it runs concurrently with identification below rather
+    # than adding its own sequential wait — by the time it's actually
+    # needed (just before diagnosis), it's usually already finished.
+    weather_task = asyncio.create_task(_fetch_weather(latitude, longitude))
+
     # Identification has to run first — everything else either needs
     # to know the species name/gbif_id, or needs is_plant_probability
     # for the diagnosis gate. But once it's done (or skipped), every
@@ -161,7 +191,7 @@ async def scan(
     plant_probability = identification.is_plant_probability if identification else None
     candidates = identification.candidates if identification else []
 
-    diagnosis_task = _run_diagnosis(image_byte_list, use_ai_diagnosis, plant_probability, candidates)
+    weather_summary = await weather_task
 
     try:
         if identification and identification.candidates:
@@ -175,7 +205,7 @@ async def scan(
             care, wiki = await _fetch_care_and_wiki(top_species)
 
             diagnosis_task = _run_diagnosis(
-                image_byte_list, use_ai_diagnosis, plant_probability, candidates, wiki,
+                image_byte_list, use_ai_diagnosis, plant_probability, candidates, wiki, weather_summary,
             )
             photo_task = _fetch_reference_photo(top_species)
             taxonomy_task = _fetch_taxonomy(top_gbif_id)
@@ -188,7 +218,9 @@ async def scan(
             identification.reference_photo = reference_photo
             identification.taxonomy = taxonomy
         else:
-            diagnosis_task = _run_diagnosis(image_byte_list, use_ai_diagnosis, plant_probability, candidates)
+            diagnosis_task = _run_diagnosis(
+                image_byte_list, use_ai_diagnosis, plant_probability, candidates, weather_summary=weather_summary,
+            )
             diagnosis_outcome = await diagnosis_task
     except ValueError as exc:
         # Raised by image decoding in image_analysis._decode
