@@ -179,7 +179,10 @@ def _format_weather(weather_summary: str | None) -> str:
             "If — and only if — this weather is genuinely relevant to caring for this plant right now, "
             "fill in weather_comment with one short, friendly sentence of practical advice (e.g. skip "
             "watering if rain's coming, or a note about heat stress on a hot day). Leave weather_comment "
-            "null if the weather doesn't suggest anything worth saying.")
+            "null if the weather doesn't suggest anything worth saying. Judge temperature by UK gardening "
+            "norms unless the location clearly indicates otherwise: for most temperate-climate plants, "
+            "high 20s°C is warm, and 30°C+ is genuinely hot and worth flagging as heat stress risk — "
+            "don't describe such temperatures as mild.")
 
 
 class AiDiagnosisService:
