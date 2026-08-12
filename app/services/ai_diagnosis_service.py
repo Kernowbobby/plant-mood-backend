@@ -185,6 +185,18 @@ def _format_weather(weather_summary: str | None) -> str:
             "don't describe such temperatures as mild.")
 
 
+def _format_season(season_context: str | None) -> str:
+    if not season_context:
+        return ""
+    return ("\n\nSeason context: "
+            f"{season_context}\n"
+            "Let this inform your observations and diagnosis where relevant — the same appearance can "
+            "mean different things at different times of year (e.g. sparser growth or yellowing lower "
+            "leaves is often completely normal in autumn/winter dormancy, but more concerning in "
+            "spring/summer active growth). Don't mention the season explicitly unless it's genuinely "
+            "useful context for the diagnosis.")
+
+
 class AiDiagnosisService:
     def __init__(self) -> None:
         self._settings = get_settings()
@@ -195,6 +207,7 @@ class AiDiagnosisService:
         candidates: list[SpeciesCandidate] | None = None,
         wiki_summary: str | None = None,
         weather_summary: str | None = None,
+        season_context: str | None = None,
     ) -> tuple[DiagnosisResult, list[SignalScore], AiInsights]:
         if not images:
             raise ValueError("At least one photo is required.")
@@ -203,7 +216,7 @@ class AiDiagnosisService:
             return self._mock_diagnose(images)
 
         try:
-            return await self._real_diagnose(images, candidates or [], wiki_summary, weather_summary)
+            return await self._real_diagnose(images, candidates or [], wiki_summary, weather_summary, season_context)
         except Exception:
             logger.exception("AI diagnosis call failed; caller should fall back to the rule-based engine.")
             raise
@@ -259,6 +272,7 @@ class AiDiagnosisService:
         candidates: list[SpeciesCandidate],
         wiki_summary: str | None = None,
         weather_summary: str | None = None,
+        season_context: str | None = None,
     ) -> tuple[DiagnosisResult, list[SignalScore], AiInsights]:
         content: list[dict] = []
         for img_bytes in images:
@@ -275,6 +289,7 @@ class AiDiagnosisService:
             + _format_candidates(candidates)
             + _format_wiki(wiki_summary)
             + _format_weather(weather_summary)
+            + _format_season(season_context)
         )
         content.append({"type": "text", "text": prompt})
 
