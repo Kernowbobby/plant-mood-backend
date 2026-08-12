@@ -21,6 +21,7 @@ from app.services.inaturalist_service import INaturalistService
 from app.services.plantnet_service import PlantNetService
 from app.services.wikipedia_service import WikipediaService
 from app.services.weather_service import WeatherService
+from app.services.season_service import get_season_context
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -107,12 +108,13 @@ async def _fetch_weather(latitude: float | None, longitude: float | None):
 
 
 async def _run_diagnosis(
-    image_byte_list, use_ai_diagnosis, plant_probability, candidates, wiki_summary=None, weather_summary=None,
+    image_byte_list, use_ai_diagnosis, plant_probability, candidates,
+    wiki_summary=None, weather_summary=None, season_context=None,
 ):
     if use_ai_diagnosis:
         try:
             result, signals, insights = await ai_diagnosis_service.diagnose(
-                image_byte_list, candidates, wiki_summary, weather_summary,
+                image_byte_list, candidates, wiki_summary, weather_summary, season_context,
             )
             return result, signals, insights
         except Exception:
@@ -193,6 +195,11 @@ async def scan(
 
     weather_summary = await weather_task
 
+    # Pure arithmetic on latitude + today's date -- no network call, so
+    # this is computed synchronously rather than as its own task. None
+    # when latitude wasn't sent, same as weather.
+    season_context = get_season_context(latitude) if latitude is not None else None
+
     try:
         if identification and identification.candidates:
             top_species = identification.candidates[0].name
@@ -205,7 +212,8 @@ async def scan(
             care, wiki = await _fetch_care_and_wiki(top_species)
 
             diagnosis_task = _run_diagnosis(
-                image_byte_list, use_ai_diagnosis, plant_probability, candidates, wiki, weather_summary,
+                image_byte_list, use_ai_diagnosis, plant_probability, candidates,
+                wiki, weather_summary, season_context,
             )
             photo_task = _fetch_reference_photo(top_species)
             taxonomy_task = _fetch_taxonomy(top_gbif_id)
@@ -219,7 +227,8 @@ async def scan(
             identification.taxonomy = taxonomy
         else:
             diagnosis_task = _run_diagnosis(
-                image_byte_list, use_ai_diagnosis, plant_probability, candidates, weather_summary=weather_summary,
+                image_byte_list, use_ai_diagnosis, plant_probability, candidates,
+                weather_summary=weather_summary, season_context=season_context,
             )
             diagnosis_outcome = await diagnosis_task
     except ValueError as exc:
