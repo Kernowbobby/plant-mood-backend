@@ -76,7 +76,18 @@ _RESPONSE_SCHEMA = {
                             "separate from how sure you are about the species.",
         },
         "summary": {"type": "string"},
-        "fix_steps": {"type": "array", "items": {"type": "string"}},
+        "fix_steps": {
+            "type": "array",
+            "items": {"type": "string"},
+            "description": "Concrete, actionable steps to address the issue, favouring organic/natural "
+                            "methods throughout — e.g. neem oil, insecticidal soap, companion planting, "
+                            "beneficial insects, cultural controls (better airflow, watering habits, "
+                            "pruning), and organic feeds (compost, seaweed or fish emulsion, blood/fish/"
+                            "bone) rather than synthetic pesticides, fungicides, or chemical NPK "
+                            "fertilizers. Only mention a synthetic option if the situation is severe "
+                            "enough that organic methods genuinely won't be sufficient, and even then "
+                            "note it as a last resort rather than the default recommendation.",
+        },
         "manual_check_recommended": {"type": "boolean"},
         "uncertainty_reason": {
             "type": ["string", "null"],
@@ -122,6 +133,28 @@ _RESPONSE_SCHEMA = {
                             "tomorrow, you can probably skip watering'. Only fill this in if weather "
                             "information was given below. Null if no weather information was provided.",
         },
+        "organic_tip": {
+            "type": ["string", "null"],
+            "description": "One short, standout organic/natural remedy or tip specifically relevant to "
+                            "this diagnosis, shown as its own highlighted card separate from fix_steps — "
+                            "e.g. 'Neem oil applied weekly should clear this within a couple of weeks' or "
+                            "'Companion planting with marigolds nearby can help deter this pest long-term.' "
+                            "Null if there's nothing organic-specific worth calling out beyond the general "
+                            "fix_steps (e.g. the plant is healthy, or the fix is purely a watering/light "
+                            "adjustment with no organic-remedy angle).",
+        },
+        "biodynamic_tip": {
+            "type": ["string", "null"],
+            "description": "One short, standout biodynamic gardening suggestion specifically relevant to "
+                            "this diagnosis, shown as its own highlighted card. Draw only on well-established, "
+                            "widely-known biodynamic preparations and practices — e.g. stinging nettle tea "
+                            "(general tonic and pest deterrent), horn silica/BD 501 (sprayed in early morning "
+                            "to strengthen light response and vigour), horn manure/BD 500 (soil and root "
+                            "vitality), chamomile or yarrow preparations, or biodynamic compost teas. Only "
+                            "suggest one if it genuinely fits this specific issue — null if there's no "
+                            "natural fit (e.g. a purely mechanical/environmental issue like direct-sun "
+                            "scorch, where no preparation is relevant).",
+        },
         "plant_voice_line": {
             "type": "string",
             "description": "A short, first-person, slightly humorous line as if the plant itself were "
@@ -132,7 +165,7 @@ _RESPONSE_SCHEMA = {
         "observations", "species_verification_note", "issue_key", "issue_label", "mood_emoji",
         "confidence", "summary", "fix_steps", "manual_check_recommended", "uncertainty_reason",
         "follow_up_photo_needed", "variety_guess", "soil_type_guidance", "bee_friendly",
-        "bee_friendly_reason", "weather_comment", "plant_voice_line",
+        "bee_friendly_reason", "weather_comment", "organic_tip", "biodynamic_tip", "plant_voice_line",
     ],
 }
 
@@ -260,6 +293,8 @@ class AiDiagnosisService:
             bee_friendly="unsure",
             bee_friendly_reason="[MOCK RESPONSE]",
             weather_comment="[MOCK] Dry and mild today — good day to check the soil.",
+            organic_tip="[MOCK] Neem oil applied weekly should help clear this.",
+            biodynamic_tip="[MOCK] A diluted stinging nettle tea makes a good general tonic here.",
         )
         return result, signals, insights
 
@@ -364,5 +399,7 @@ class AiDiagnosisService:
             bee_friendly=parsed.get("bee_friendly"),
             bee_friendly_reason=parsed.get("bee_friendly_reason"),
             weather_comment=parsed.get("weather_comment"),
+            organic_tip=parsed.get("organic_tip"),
+            biodynamic_tip=parsed.get("biodynamic_tip"),
         )
         return result, signals, insights
