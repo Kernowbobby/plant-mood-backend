@@ -129,6 +129,8 @@ class AiInsights(BaseModel):
     bee_friendly: Optional[str] = None  # "yes" | "no" | "unsure"
     bee_friendly_reason: Optional[str] = None
     weather_comment: Optional[str] = None  # short, friendly note tied to current/tomorrow's weather at the scan location — only set when latitude/longitude were provided
+    organic_tip: Optional[str] = None  # one standout organic/natural remedy specific to this diagnosis, shown as its own card
+    biodynamic_tip: Optional[str] = None  # one standout biodynamic preparation/practice specific to this diagnosis, shown as its own card
 
 
 class ScanResponse(BaseModel):
