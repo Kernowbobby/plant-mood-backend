@@ -285,7 +285,7 @@ class AiDiagnosisService:
         }
         payload = {
             "model": self._settings.ai_diagnosis_model,
-            "max_tokens": 800,
+            "max_tokens": 1500,
             "messages": [{"role": "user", "content": content}],
             "output_config": {
                 "format": {
