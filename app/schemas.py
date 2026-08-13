@@ -131,6 +131,8 @@ class AiInsights(BaseModel):
     weather_comment: Optional[str] = None  # short, friendly note tied to current/tomorrow's weather at the scan location — only set when latitude/longitude were provided
     organic_tip: Optional[str] = None  # one standout organic/natural remedy specific to this diagnosis, shown as its own card
     biodynamic_tip: Optional[str] = None  # one standout biodynamic preparation/practice specific to this diagnosis, shown as its own card
+    biodynamic_day_type: Optional[str] = None  # "root" | "leaf" | "flower" | "fruit" — computed independently from sidereal moon position, not AI-generated
+    biodynamic_day_description: Optional[str] = None  # short caption for biodynamic_day_type, e.g. "Flower day — a day best suited to work on flowering plants."
 
 
 class ScanResponse(BaseModel):
