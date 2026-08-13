@@ -22,6 +22,7 @@ from app.services.plantnet_service import PlantNetService
 from app.services.wikipedia_service import WikipediaService
 from app.services.weather_service import WeatherService
 from app.services.season_service import get_season_context
+from app.services.biodynamic_service import get_biodynamic_day
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -236,6 +237,15 @@ async def scan(
         raise HTTPException(status_code=400, detail=str(exc))
 
     diagnosis_result, signals, ai_insights = diagnosis_outcome
+
+    # Pure date arithmetic, same as season_context -- no network call,
+    # not location-dependent (moon's sidereal position is the same for
+    # every observer on a given day), so it's cheap to attach here
+    # rather than asking the AI to compute or state it. Only attached
+    # when ai_insights exists, since that's the only response shape the
+    # Android app currently reads this kind of extra card data from.
+    if ai_insights is not None:
+        ai_insights.biodynamic_day_type, ai_insights.biodynamic_day_description = get_biodynamic_day()
 
     return ScanResponse(
         identification=identification,
