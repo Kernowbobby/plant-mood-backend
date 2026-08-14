@@ -110,6 +110,17 @@ _RESPONSE_SCHEMA = {
                             "one, e.g. 'possibly a Lollo Rosso lettuce, given the ruffled red-tinged leaves'. "
                             "Explicitly a guess, not an authoritative ID. Null if there's not enough detail.",
         },
+        "fallback_species_guess": {
+            "type": ["string", "null"],
+            "description": "ONLY fill this in when told below that no species candidates were provided "
+                            "(i.e. the reference identification lookup found nothing). In that case, give "
+                            "your own best-effort guess at the plant's species from the photo — common name "
+                            "and, if you're confident enough, a scientific name, e.g. 'Likely a tomato plant "
+                            "(Solanum lycopersicum), though this hasn't been confirmed against a reference "
+                            "database.' Always phrase it as an estimate, never as a confirmed identification. "
+                            "If candidates WERE provided, or the photo genuinely gives no basis for even a "
+                            "rough guess, leave this null.",
+        },
         "soil_type_guidance": {
             "type": ["string", "null"],
             "description": "A brief note on soil preference for this plant, if identifiable enough to say. "
@@ -166,6 +177,7 @@ _RESPONSE_SCHEMA = {
         "confidence", "summary", "fix_steps", "manual_check_recommended", "uncertainty_reason",
         "follow_up_photo_needed", "variety_guess", "soil_type_guidance", "bee_friendly",
         "bee_friendly_reason", "weather_comment", "organic_tip", "biodynamic_tip", "plant_voice_line",
+        "fallback_species_guess",
     ],
 }
 
@@ -185,7 +197,11 @@ Do not request a follow-up photo just because you're not 100% certain — only w
 
 def _format_candidates(candidates: list[SpeciesCandidate]) -> str:
     if not candidates:
-        return ""
+        return ("\n\nNo species candidates were provided — the separate reference identification "
+                "lookup found nothing (it may have failed or hit its usage limit). Species_verification_note "
+                "and variety_guess should be null in this case, since there's nothing to verify against. "
+                "Instead, attempt your own best-effort species guess purely from what's visible in the "
+                "photo and fill in fallback_species_guess accordingly — see that field's description.")
     lines = ["\nA separate species-identification model suggested these candidates for this photo "
              "(most likely first) — use these as a reference, but trust what you actually see in the "
              "photo over the list if they conflict:"]
@@ -295,6 +311,7 @@ class AiDiagnosisService:
             weather_comment="[MOCK] Dry and mild today — good day to check the soil.",
             organic_tip="[MOCK] Neem oil applied weekly should help clear this.",
             biodynamic_tip="[MOCK] A diluted stinging nettle tea makes a good general tonic here.",
+            fallback_species_guess=None,
         )
         return result, signals, insights
 
@@ -401,5 +418,6 @@ class AiDiagnosisService:
             weather_comment=parsed.get("weather_comment"),
             organic_tip=parsed.get("organic_tip"),
             biodynamic_tip=parsed.get("biodynamic_tip"),
+            fallback_species_guess=parsed.get("fallback_species_guess"),
         )
         return result, signals, insights
