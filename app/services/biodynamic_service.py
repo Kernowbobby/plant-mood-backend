@@ -58,10 +58,10 @@ _DAY_TYPE_BY_ELEMENT = {
 }
 
 _DESCRIPTION_BY_DAY_TYPE = {
-    "fruit": "Fruit day — a day best suited to fruiting plants and seed-bearing crops.",
-    "root": "Root day — a day best suited to root crops and below-ground growth.",
-    "flower": "Flower day — a day best suited to work on flowering plants.",
-    "leaf": "Leaf day — a day best suited to leafy greens and foliage growth.",
+    "fruit": "Fruit day — a good day for working with fruiting plants and seed-bearing crops.",
+    "root": "Root day — a good day for working with root crops and below-ground growth.",
+    "flower": "Flower day — a good day for working with flowering plants.",
+    "leaf": "Leaf day — a good day for working with leafy greens and foliage growth.",
 }
 
 
