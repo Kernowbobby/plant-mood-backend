@@ -206,18 +206,21 @@ async def scan(
             top_species = identification.candidates[0].name
             top_gbif_id = identification.candidates[0].gbif_id
 
-            # Wiki has to be fetched *before* diagnosis now, so the AI can
-            # actually read it — this is the one part of the pipeline that
-            # can no longer be fully parallel. Photo and taxonomy are
-            # unaffected and still run alongside diagnosis.
+            # Photo and taxonomy don't depend on wiki/care at all -- only
+            # on top_species/top_gbif_id, both already known here -- so
+            # they're started immediately as real tasks rather than
+            # waiting for care/wiki to finish first. Wiki is the one
+            # genuine bottleneck: diagnosis needs its result, so that
+            # part alone can't be made concurrent with diagnosis itself.
+            photo_task = asyncio.create_task(_fetch_reference_photo(top_species))
+            taxonomy_task = asyncio.create_task(_fetch_taxonomy(top_gbif_id))
+
             care, wiki = await _fetch_care_and_wiki(top_species)
 
             diagnosis_task = _run_diagnosis(
                 image_byte_list, use_ai_diagnosis, plant_probability, candidates,
                 wiki, weather_summary, season_context,
             )
-            photo_task = _fetch_reference_photo(top_species)
-            taxonomy_task = _fetch_taxonomy(top_gbif_id)
 
             diagnosis_outcome, reference_photo, taxonomy = await asyncio.gather(
                 diagnosis_task, photo_task, taxonomy_task,
