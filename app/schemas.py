@@ -133,6 +133,7 @@ class AiInsights(BaseModel):
     biodynamic_tip: Optional[str] = None  # one standout biodynamic preparation/practice specific to this diagnosis, shown as its own card
     biodynamic_day_type: Optional[str] = None  # "root" | "leaf" | "flower" | "fruit" — computed independently from sidereal moon position, not AI-generated
     biodynamic_day_description: Optional[str] = None  # short caption for biodynamic_day_type, e.g. "Flower day — a day best suited to work on flowering plants."
+    fallback_species_guess: Optional[str] = None  # only set when PlantNet identification failed/returned nothing — the AI's own best-effort species guess from the photo, explicitly unconfirmed. Never set alongside a successful PlantNet identification.
 
 
 class ScanResponse(BaseModel):
