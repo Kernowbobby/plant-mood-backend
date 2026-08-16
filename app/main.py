@@ -229,7 +229,21 @@ async def scan(
     season_context = get_season_context(latitude) if latitude is not None else None
 
     try:
-        if identification and identification.candidates:
+        # Every lookup below is keyed off the top candidate's species
+        # name or gbif_id. When confidence_band is "none" there is no
+        # species being claimed — either Pl@ntNet returned nothing, or it
+        # returned scattered low-scoring guesses that disagree with each
+        # other (see plantnet_service._build_display). Fetching care,
+        # taxonomy and a wiki summary for the top guess anyway is how a
+        # harbour photograph ended up with hollyhock watering advice
+        # attached to it on 16 Aug 2026. If we won't name it, we don't
+        # look it up either.
+        species_is_claimed = (
+            identification
+            and identification.candidates
+            and identification.confidence_band != "none"
+        )
+        if species_is_claimed:
             top_species = identification.candidates[0].name
             top_gbif_id = identification.candidates[0].gbif_id
 
