@@ -15,7 +15,7 @@ from app.config import get_settings
 from app.schemas import ScanResponse
 from app.services.ai_diagnosis_service import AiDiagnosisService
 from app.services.care_service import CareService
-from app.services.diagnosis_engine import diagnose
+from app.services.diagnosis_engine import diagnose, NOT_A_PLANT_PROBABILITY_THRESHOLD
 from app.services.gbif_service import GbifService
 from app.services.inaturalist_service import INaturalistService
 from app.services.plantnet_service import PlantNetService
@@ -112,6 +112,33 @@ async def _run_diagnosis(
     image_byte_list, use_ai_diagnosis, plant_probability, candidates,
     wiki_summary=None, weather_summary=None, season_context=None,
 ):
+    # PRESENCE GATE — runs before either diagnosis path, not just the
+    # rule-based one. Previously this check lived only inside diagnose(),
+    # which meant the AI path skipped it entirely: fed a photo with no
+    # plant in it, the vision model would invent a species, invent a
+    # diagnosis for it, and report high confidence. Confirmed in
+    # Melbourne testing on 16 Aug — a photo of an empty vase came back
+    # as "jade plant, leggy growth, 75%, 2 of 2 photos agreed".
+    #
+    # plant_probability is None only when identification was skipped
+    # entirely (skip_id=true), in which case we have no basis to gate on
+    # and must let the diagnosis run. See plantnet_service.py for why a
+    # failed API call now scores 0.5 rather than 0.0 — an unreachable
+    # Pl@ntNet must not be read as "no plant here".
+    if (
+        plant_probability is not None
+        and plant_probability < NOT_A_PLANT_PROBABILITY_THRESHOLD
+    ):
+        # Delegate to the rule-based engine, which already builds the
+        # not_a_plant result from ISSUE_LIBRARY. Reusing it keeps one
+        # definition of that response rather than a second copy here.
+        # ai_insights stays None, so no fallback_species_guess is
+        # offered for something that isn't a plant.
+        result, signals = await asyncio.to_thread(
+            diagnose, image_byte_list, is_plant_probability=plant_probability,
+        )
+        return result, signals, None
+
     if use_ai_diagnosis:
         try:
             result, signals, insights = await ai_diagnosis_service.diagnose(
