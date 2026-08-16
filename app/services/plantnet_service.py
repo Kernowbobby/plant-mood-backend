@@ -122,12 +122,24 @@ def _build_display(candidates: list[SpeciesCandidate]) -> tuple[str, str | None,
             f"Closest match was {top.name}. Compare with the reference photo below.",
         )
 
+    # Weak scores AND no genus agreement. This is Pl@ntNet grasping, not
+    # identifying, and it is the signature of a photo with no plant in it
+    # at all: a black-and-white harbour scene tested on 16 Aug 2026
+    # returned Hollyhock (Malvaceae), Sugarcane (Poaceae) and Stinging
+    # nettle (Urticaceae) — three families, none above 20%. Pl@ntNet does
+    # not return an empty list for a non-plant; it returns noise, which is
+    # why is_plant_probability alone can't catch this case.
+    #
+    # Naming the top guess here would put "Hollyhock" in a heading above a
+    # diagnosis that reads "this is not a plant photograph". Better to
+    # claim nothing. The AI diagnosis path still runs and still explains
+    # what it sees.
     return (
-        "uncertain",
-        common or top.name,
-        top.name if common else None,
-        "Uncertain — treat this as a starting point rather than an identification. "
-        "Compare with the reference photo below.",
+        "none",
+        None,
+        None,
+        "No reliable identification from this photo — the suggestions disagreed with "
+        "each other and none scored well. Try a closer, well-lit photo of a single plant.",
     )
 
 
