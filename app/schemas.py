@@ -82,6 +82,25 @@ class IdentifyResponse(BaseModel):
     wiki_summary: Optional[WikiSummary] = None
     taxonomy: Optional[GbifTaxonomy] = None
 
+    # --- Confidence banding -------------------------------------------
+    # Pl@ntNet's raw probability is honest but useless to a grower: it
+    # scores low even when it's right (0.38 on a correct tomato, 0.21 on
+    # a correct pineapple sage). Printing "Match confidence: 16%" next to
+    # a species name in a heading does two bad things at once — it looks
+    # broken to someone who trusts it, and it doesn't stop someone who
+    # doesn't. Melbourne testing on 16 Aug: an Alocasia scored 0.16, was
+    # rendered as a settled "Alocasia odora", and was wrong at species
+    # level (nursery label said A. macrorrhizos). Genus was right.
+    #
+    # So the band, not the number, drives what the app shows. The
+    # thresholds and the wording both live in plantnet_service.py, which
+    # means retuning them is a backend commit — no new APK for testers
+    # who are sideloading.
+    confidence_band: str = "none"  # "confirmed" | "probable" | "uncertain" | "none"
+    display_title: Optional[str] = None  # heading — a species common name, or a bare genus when the species isn't supportable
+    display_subtitle: Optional[str] = None  # scientific name, or None when only the genus is being claimed
+    display_note: Optional[str] = None  # replaces the raw percentage, e.g. "Genus only — species couldn't be pinned down from this photo"
+
 
 class SignalScore(BaseModel):
     """One scorer's vote. `issue` must match a key in ISSUE_LIBRARY."""
