@@ -192,7 +192,9 @@ If you cannot confidently distinguish between two or more meaningfully different
 
 These two fields serve different purposes and must NOT be merged: uncertainty_reason explains WHY you're unsure in general terms (for the human reading the result). follow_up_photo_instruction is a SEPARATE, ACTIONABLE instruction telling the camera app exactly what photo to take next — name the exact plant part, what to look for, and any framing guidance (e.g. "underside of a yellowing leaf, close enough to see any insects or eggs"). Whenever follow_up_photo_needed is true, follow_up_photo_instruction must be filled in with this actionable guidance — it is never left null when follow_up_photo_needed is true, even if uncertainty_reason already touches on similar detail.
 
-Do not request a follow-up photo just because you're not 100% certain — only when a specific photo would genuinely resolve a real ambiguity. If you can identify the plant and see a clear issue, give your best diagnosis with an honest confidence level instead."""
+Do not request a follow-up photo just because you're not 100% certain — only when a specific photo would genuinely resolve a real ambiguity. If you can identify the plant and see a clear issue, give your best diagnosis with an honest confidence level instead.
+
+Write every field in plain prose for a gardener. Where a dash is wanted, use a real em dash (—). Never write two hyphens (--) in place of one: it is rendered literally in the app and reads as a typo."""
 
 
 def _format_candidates(candidates: list[SpeciesCandidate]) -> str:
