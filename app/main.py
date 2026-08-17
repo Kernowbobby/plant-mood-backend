@@ -8,6 +8,9 @@ pipeline, tested in isolation, before anything else gets bolted on.
 import asyncio
 import logging
 
+import cv2
+import numpy as np
+
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -108,6 +111,66 @@ async def _fetch_weather(latitude: float | None, longitude: float | None):
         return None
 
 
+# The long edge Anthropic's vision API scales images down to before the
+# model ever sees them. Anything larger is bytes we base64-encode (which
+# adds a third again), upload, and pay latency for, so that a resize can
+# be done at the far end and the extra detail thrown away.
+_VISION_MAX_EDGE_PX = 1568
+_VISION_JPEG_QUALITY = 85
+
+
+def _downscale(image_bytes: bytes) -> bytes:
+    """
+    Reduce a camera original to something the pipeline can actually use.
+
+    A modern phone photograph arrives at eight or twelve megapixels and
+    several megabytes. Nothing downstream wants that. The vision model
+    resizes to 1568px on its own side regardless; Pl@ntNet resizes on
+    theirs; and the rule-based engine already normalises to 800px before
+    it looks at a single pixel. The full-size upload was pure cost — on
+    the phone's connection, in the base64 payload, and in memory here.
+
+    Returns the ORIGINAL bytes untouched if the photo is already small
+    enough, so an image that needs nothing doing to it is not put through
+    a needless JPEG generation and quietly degraded.
+
+    Never raises. A photo this cannot decode is handed on exactly as it
+    arrived, and whatever comes next deals with it — a resize failing is
+    not a reason for a scan to fail.
+    """
+    try:
+        arr = np.frombuffer(image_bytes, dtype=np.uint8)
+        img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+        if img is None:
+            return image_bytes
+
+        h, w = img.shape[:2]
+        long_edge = max(h, w)
+        if long_edge <= _VISION_MAX_EDGE_PX:
+            return image_bytes
+
+        scale = _VISION_MAX_EDGE_PX / long_edge
+        # INTER_AREA is the right filter for shrinking; it averages the
+        # pixels being collapsed rather than sampling one of them, which
+        # matters when the thing being diagnosed is leaf texture.
+        resized = cv2.resize(
+            img,
+            (int(w * scale), int(h * scale)),
+            interpolation=cv2.INTER_AREA,
+        )
+        ok, encoded = cv2.imencode(
+            ".jpg",
+            resized,
+            [int(cv2.IMWRITE_JPEG_QUALITY), _VISION_JPEG_QUALITY],
+        )
+        if not ok:
+            return image_bytes
+        return encoded.tobytes()
+    except Exception:
+        logger.exception("Could not downscale an image; sending it on as uploaded.")
+        return image_bytes
+
+
 async def _run_diagnosis(
     image_byte_list, use_ai_diagnosis, plant_probability, candidates,
     wiki_summary=None, weather_summary=None, season_context=None,
@@ -197,7 +260,9 @@ async def scan(
             raise HTTPException(status_code=400, detail="One of the uploaded files is empty.")
         if len(image_bytes) > settings.max_upload_bytes:
             raise HTTPException(status_code=413, detail="One of the images is too large.")
-        image_byte_list.append(image_bytes)
+        # Shrunk once, here, so every downstream consumer gets the smaller
+        # version: Pl@ntNet, the AI call, and the rule-based engine.
+        image_byte_list.append(await asyncio.to_thread(_downscale, image_bytes))
 
     # Started now so it runs concurrently with identification below rather
     # than adding its own sequential wait — by the time it's actually
