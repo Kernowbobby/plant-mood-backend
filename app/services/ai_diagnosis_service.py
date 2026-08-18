@@ -67,6 +67,15 @@ _RESPONSE_SCHEMA = {
                             "visible, and why. State plainly if none of them look right. Null if no "
                             "candidates were provided.",
         },
+        "is_plant": {
+            "type": "boolean",
+            "description": "False if the photo does not show a real, living plant — a manufactured "
+                            "object, an artificial or model plant, an animal, a person, a building, a "
+                            "landscape with no identifiable plant subject, a drawing or screen. True "
+                            "for any real growing plant, including a dead, damaged or dormant one, and "
+                            "including cut flowers or harvested produce. When false, see the summary "
+                            "field for what to write instead.",
+        },
         "issue_key": {"type": "string", "enum": _KNOWN_ISSUES},
         "issue_label": {"type": "string"},
         "mood_emoji": {"type": "string"},
@@ -75,7 +84,13 @@ _RESPONSE_SCHEMA = {
             "description": "0 to 1. This is diagnosis confidence specifically — keep it honest and "
                             "separate from how sure you are about the species.",
         },
-        "summary": {"type": "string"},
+        "summary": {
+            "type": "string",
+            "description": "When is_plant is true: a short plain-prose account of the plant's "
+                            "condition. When is_plant is FALSE this field carries the whole answer — "
+                            "say what the photo actually shows, in two or three sentences. See the "
+                            "instructions below for how to pitch it.",
+        },
         "fix_steps": {
             "type": "array",
             "items": {"type": "string"},
@@ -173,6 +188,7 @@ _RESPONSE_SCHEMA = {
         },
     },
     "required": [
+        "is_plant",
         "observations", "species_verification_note", "issue_key", "issue_label", "mood_emoji",
         "confidence", "summary", "fix_steps", "manual_check_recommended", "uncertainty_reason",
         "follow_up_photo_needed", "variety_guess", "soil_type_guidance", "bee_friendly",
@@ -194,7 +210,30 @@ These two fields serve different purposes and must NOT be merged: uncertainty_re
 
 Do not request a follow-up photo just because you're not 100% certain — only when a specific photo would genuinely resolve a real ambiguity. If you can identify the plant and see a clear issue, give your best diagnosis with an honest confidence level instead.
 
-Write every field in plain prose for a gardener. Where a dash is wanted, use a real em dash (—). Never write two hyphens (--) in place of one: it is rendered literally in the app and reads as a typo."""
+Write every field in plain prose for a gardener. Where a dash is wanted, use a real em dash (—). Never write two hyphens (--) in place of one: it is rendered literally in the app and reads as a typo.
+
+WHEN THE PHOTO IS NOT A PLANT
+Set is_plant to false and put your whole answer in summary: say what the photo actually shows, \
+in two or three sentences of warm, plain prose. Set issue_label to a short headline for it \
+(e.g. "A LEGO model", "A garden gate", "A cat") and pick a mood_emoji that suits the subject \
+rather than a plant's health. Do not scold the user for photographing something that isn't a \
+plant, and do not tell them to take a better photo — they know what they pointed the camera at. \
+Nobody is being diagnosed here, so nothing is being got wrong.
+
+State what you are sure of first, and mark anything less certain as a guess in the same breath: \
+"A carved wooden bench, oak by the grain — the setting looks like a walled garden, though I \
+couldn't say where." Name a genuinely famous building, landmark or artwork if you recognise it. \
+For anywhere ordinary — a street, a beach, a field, a garden — describe the kind of place and \
+say plainly that you can't identify it, rather than naming somewhere plausible. A wrong place \
+name stated confidently is worse than no place name.
+
+Two firm limits. Never identify or describe individual people by name, and never guess a \
+person's identity from a photo. Never infer or state a location for anything that looks like \
+somebody's home, garden, yard or street, even if the architecture, plants or signage would let \
+you — these photos are often taken by children and families, and a home is not ours to place.
+
+Interesting is welcome: what a thing is made of, roughly when it is from, what it is for, how \
+it works, a piece of history behind it. The reader is curious, not in trouble."""
 
 
 def _format_candidates(candidates: list[SpeciesCandidate]) -> str:
@@ -259,7 +298,7 @@ class AiDiagnosisService:
         wiki_summary: str | None = None,
         weather_summary: str | None = None,
         season_context: str | None = None,
-    ) -> tuple[DiagnosisResult, list[SignalScore], AiInsights]:
+    ) -> tuple[DiagnosisResult, list[SignalScore], AiInsights | None]:
         if not images:
             raise ValueError("At least one photo is required.")
 
@@ -327,7 +366,7 @@ class AiDiagnosisService:
         wiki_summary: str | None = None,
         weather_summary: str | None = None,
         season_context: str | None = None,
-    ) -> tuple[DiagnosisResult, list[SignalScore], AiInsights]:
+    ) -> tuple[DiagnosisResult, list[SignalScore], AiInsights | None]:
         content: list[dict] = []
         for img_bytes in images:
             content.append({
@@ -410,6 +449,39 @@ class AiDiagnosisService:
                   f"{len(result.observations)} observation(s) noted.",
             image_index=0,
         )]
+
+        # NOT A PLANT — the description is the whole answer.
+        #
+        # Everything downstream of a diagnosis is advice about a plant, and
+        # there is no plant here. Rather than trust the model to leave a
+        # dozen fields null, strip them deterministically: empty fix_steps
+        # (which is what left an orphaned "What to do" heading on screen),
+        # no voice line, no follow-up photo request — the user knows what
+        # they pointed the camera at.
+        #
+        # Returning None for insights rather than an empty AiInsights is
+        # deliberate and does real work: main.py only attaches the
+        # biodynamic day when ai_insights is not None, so this one line
+        # also suppresses the biodynamic card. A root day is a fact about
+        # today, but printed under a photo of a LEGO model it reads as
+        # advice about the LEGO model.
+        if not bool(parsed.get("is_plant", True)):
+            result.fix_steps = []
+            result.observations = []
+            result.plant_voice_line = ""
+            result.manual_check_recommended = False
+            result.follow_up_photo_needed = False
+            result.follow_up_photo_instruction = None
+            result.uncertainty_reason = None
+            # "2 of 2 photos agreed" is corroboration language, and there
+            # is nothing here to corroborate — it was one of the three
+            # things that made the invented jade plant sound so credible.
+            # Collapsing the counts to one is what stops the app printing
+            # it. The photos were not cross-checked; they were looked at.
+            result.supporting_photo_count = 1
+            result.total_photo_count = 1
+            result.agreement_ratio = 1.0
+            return result, signals, None
 
         insights = AiInsights(
             species_verification_note=parsed.get("species_verification_note"),
