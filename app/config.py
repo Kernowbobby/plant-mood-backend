@@ -52,6 +52,21 @@ class Settings:
     anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
     ai_diagnosis_model: str = os.getenv("AI_DIAGNOSIS_MODEL", "claude-haiku-4-5-20251001")
 
+    # Model used ONLY for describing a photo that isn't a plant — see
+    # image_description_service.py. Deliberately a different, stronger
+    # model from the diagnosis one, for two reasons.
+    #
+    # First, the jobs are different. Diagnosing a leaf is a narrow
+    # visual comparison against a candidate list. Saying what an
+    # unfamiliar object is draws on general world knowledge — buildings,
+    # materials, machinery, toys, animals — which is exactly where the
+    # larger models pull ahead.
+    #
+    # Second, it is nearly free. This call only ever happens on photos
+    # that contain no plant, which is a small fraction of scans, and the
+    # difference per call is under half a penny.
+    image_description_model: str = os.getenv("IMAGE_DESCRIPTION_MODEL", "claude-sonnet-5")
+
     @property
     def ai_diagnosis_mock_mode(self) -> bool:
         return not self.anthropic_api_key
