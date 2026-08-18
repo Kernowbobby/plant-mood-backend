@@ -20,6 +20,7 @@ from app.services.ai_diagnosis_service import AiDiagnosisService
 from app.services.care_service import CareService
 from app.services.diagnosis_engine import diagnose, NOT_A_PLANT_PROBABILITY_THRESHOLD
 from app.services.gbif_service import GbifService
+from app.services.image_description_service import ImageDescriptionService
 from app.services.inaturalist_service import INaturalistService
 from app.services.plantnet_service import PlantNetService
 from app.services.wikipedia_service import WikipediaService
@@ -51,6 +52,7 @@ inaturalist_service = INaturalistService()
 wikipedia_service = WikipediaService()
 gbif_service = GbifService()
 ai_diagnosis_service = AiDiagnosisService()
+image_description_service = ImageDescriptionService()
 weather_service = WeatherService()
 
 
@@ -192,6 +194,29 @@ async def _run_diagnosis(
         plant_probability is not None
         and plant_probability < NOT_A_PLANT_PROBABILITY_THRESHOLD
     ):
+        # There is no plant here, so nothing is going to be diagnosed.
+        # The only remaining question is whether the user gets a canned
+        # line or an actual answer about what they photographed.
+        #
+        # This is a describe-only call with a schema containing no
+        # diagnosis fields at all — see image_description_service.py for
+        # why that structural separation matters rather than simply
+        # reusing the diagnosis prompt. The gate itself is unchanged:
+        # nothing that was refused before is allowed now.
+        try:
+            result, signals = await image_description_service.describe(image_byte_list)
+            # ai_insights stays None. That suppresses the bee note, the
+            # organic and biodynamic tips, and — because main.py only
+            # attaches the biodynamic day when insights exist — the
+            # calendar card too. A root day is a fact about today, but
+            # printed under a photo of a LEGO model it reads as advice
+            # about the LEGO model.
+            return result, signals, None
+        except Exception:
+            logger.exception(
+                "Image description unavailable; falling back to the canned not_a_plant response."
+            )
+
         # Delegate to the rule-based engine, which already builds the
         # not_a_plant result from ISSUE_LIBRARY. Reusing it keeps one
         # definition of that response rather than a second copy here.
