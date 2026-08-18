@@ -466,6 +466,18 @@ class AiDiagnosisService:
         # today, but printed under a photo of a LEGO model it reads as
         # advice about the LEGO model.
         if not bool(parsed.get("is_plant", True)):
+            # The enum above cannot contain "not_a_plant": it is the list
+            # of things that can be wrong WITH a plant, and the model
+            # picking it would be the model deciding the gate question for
+            # itself. So the model files this under "unclear" and the key
+            # is corrected here, once is_plant has answered it properly.
+            #
+            # This matters beyond tidiness. The app keys off issue_key to
+            # decide what furniture to draw — it is what suppresses the
+            # confidence percentage and the "no species identified" block,
+            # neither of which means anything on a photo of a baseball
+            # game. Leaving it as "unclear" left both on screen.
+            result.issue_key = "not_a_plant"
             result.fix_steps = []
             result.observations = []
             result.plant_voice_line = ""
@@ -481,6 +493,17 @@ class AiDiagnosisService:
             result.supporting_photo_count = 1
             result.total_photo_count = 1
             result.agreement_ratio = 1.0
+            # The signal is the transparency record of what voted for
+            # what. It was built above from the model's own "unclear",
+            # so correct it too rather than leaving the response
+            # disagreeing with itself.
+            signals = [SignalScore(
+                signal_name="ai_vision",
+                issue="not_a_plant",
+                confidence=result.confidence,
+                notes=f"No plant present. Described via {self._settings.ai_diagnosis_model}.",
+                image_index=0,
+            )]
             return result, signals, None
 
         insights = AiInsights(
