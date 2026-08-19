@@ -7,6 +7,7 @@ pipeline, tested in isolation, before anything else gets bolted on.
 """
 import asyncio
 import logging
+from datetime import date, datetime
 
 import cv2
 import numpy as np
@@ -243,6 +244,43 @@ async def _run_diagnosis(
     return result, signals, None
 
 
+def _parse_captured_at(raw: str | None) -> date | None:
+    """
+    Turn the client's capture-date string into a date, or None.
+
+    Deliberately forgiving. This value only chooses which season is
+    described in a prompt; nothing depends on it and nothing breaks
+    without it. A phone sending a malformed date, or an EXIF block with
+    something odd in it, should lose the seasonal nicety and still get a
+    diagnosis — never a 422 and a failed scan.
+
+    EXIF's own format (2019:06:15 14:22:00) is accepted alongside ISO,
+    since that is where this value comes from and converting it on the
+    Android side would be one more thing to get wrong.
+    """
+    if not raw:
+        return None
+    text = raw.strip()
+    if not text:
+        return None
+
+    # EXIF uses colons in the date part, which fromisoformat rejects.
+    # Only the first two are date separators; any later ones belong to
+    # the time and must be left alone.
+    if len(text) >= 10 and text[4] == ":" and text[7] == ":":
+        text = text[:4] + "-" + text[5:7] + "-" + text[8:]
+
+    try:
+        return datetime.fromisoformat(text).date()
+    except ValueError:
+        pass
+    try:
+        return date.fromisoformat(text[:10])
+    except ValueError:
+        logger.warning("Ignoring unparseable captured_at value from the client.")
+        return None
+
+
 @app.post("/scan", response_model=ScanResponse)
 async def scan(
     photos: list[UploadFile] = File(..., description="One to four photos of the same plant/issue."),
@@ -264,6 +302,15 @@ async def scan(
     longitude: float | None = Query(
         default=None,
         description="Optional, paired with latitude — see above.",
+    ),
+    captured_at: str | None = Query(
+        default=None,
+        description="Optional. The date the PHOTO was taken, as ISO-8601 (e.g. 2019-06-15 or "
+                    "2019-06-15T14:22:00). Send this when the photo came from the gallery and "
+                    "may be old; omit it for a camera capture taken seconds ago, where today's "
+                    "date is already correct. Used only to pick the season described to the "
+                    "diagnosis model. Anything unparseable is ignored rather than rejected — a "
+                    "bad date should not fail a scan.",
     ),
 ):
     settings = get_settings()
@@ -313,10 +360,20 @@ async def scan(
 
     weather_summary = await weather_task
 
-    # Pure arithmetic on latitude + today's date -- no network call, so
-    # this is computed synchronously rather than as its own task. None
-    # when latitude wasn't sent, same as weather.
-    season_context = get_season_context(latitude) if latitude is not None else None
+    # Pure arithmetic on latitude + a date -- no network call, so this is
+    # computed synchronously rather than as its own task. None when
+    # latitude wasn't sent, same as weather.
+    #
+    # The date is the photo's own capture date when the client knows it.
+    # A June garden visit scanned in November should be read as June, not
+    # as November: the plant in the photograph was never in November's
+    # state, and reasoning about it as though it were is the app
+    # asserting something it has not established.
+    captured_date = _parse_captured_at(captured_at)
+    season_context = (
+        get_season_context(latitude, reference_date=captured_date)
+        if latitude is not None else None
+    )
 
     try:
         # Every lookup below is keyed off the top candidate's species
